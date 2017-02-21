@@ -1,4 +1,4 @@
-PROGRAM = raytracer
+PROGRAM = rasteriser
 
 S_DIR=Source
 B_DIR=Build
