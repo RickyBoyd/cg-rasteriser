@@ -17,6 +17,6 @@ include_directories(SDL_INCLUDE_DIR)
 include_directories("/usr/include/SDL")
 include_directories(GLM_INCLUDE_DIR)
 
-add_executable(main_raytracer Source/raytracer.cpp)
+add_executable(main_rasteriser Source/rasteriser.cpp)
 
-target_link_libraries(main_raytracer ${SDL_LIBRARY})
+target_link_libraries(main_rasteriser ${SDL_LIBRARY})
