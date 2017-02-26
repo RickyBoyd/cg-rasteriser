@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.26206.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "COMS30115-raytracer", "COMS30115-raytracer.vcxproj", "{23583F58-CE36-4021-8274-C93FA17AE756}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "COMS30115-rasteriser", "COMS30115-rasteriser.vcxproj", "{23583F58-CE36-4021-8274-C93FA17AE756}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="source\raytracer.cpp">
+    <ClCompile Include="source\rasteriser.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Source\SDLauxiliary.cpp">
@@ -44,7 +44,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="source\raytracer.h">
+    <ClInclude Include="source\rasteriser.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="source\SDLauxiliary.h">

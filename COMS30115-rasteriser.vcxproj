@@ -143,7 +143,7 @@
     <ClCompile Include="Source\Light.cpp" />
     <ClCompile Include="Source\Material.cpp" />
     <ClCompile Include="source\Model.cpp" />
-    <ClCompile Include="source\raytracer.cpp" />
+    <ClCompile Include="source\rasteriser.cpp" />
     <ClCompile Include="Source\Scene.cpp" />
     <ClCompile Include="Source\SDLauxiliary.cpp" />
     <ClCompile Include="Source\Triangle.cpp" />
@@ -154,7 +154,7 @@
     <ClInclude Include="Source\Light.h" />
     <ClInclude Include="Source\Material.h" />
     <ClInclude Include="source\Model.h" />
-    <ClInclude Include="source\raytracer.h" />
+    <ClInclude Include="source\rasteriser.h" />
     <ClInclude Include="Source\Scene.h" />
     <ClInclude Include="source\SDLauxiliary.h" />
     <ClInclude Include="source\Triangle.h" />
