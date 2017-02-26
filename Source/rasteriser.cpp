@@ -31,9 +31,6 @@ using namespace std;
 using glm::vec3;
 using glm::mat3;
 
-/* ----------------------------------------------------------------------------*/
-/* GLOBAL VARIABLES                                                            */
-
 const int SCREEN_WIDTH = 500;
 const int SCREEN_HEIGHT = 500;
 //const int AA_SAMPLES = 4;
@@ -42,16 +39,13 @@ SDL_Surface *screen;
 int t;
 const float FOCAL_LENGTH = SCREEN_WIDTH / 2;
 
-/* ----------------------------------------------------------------------------*/
-/* FUNCTIONS                                                                   */
-
 void Update(Scene &scene, Uint8 &lightSelected);
 
 void Draw(Scene &scene, const vector<Triangle> &triangles);
 
 void Interpolate(float a, float b, vector<float> &result);
 
-void VertexShader( const vec3& v, glm::ivec2& p );
+void VertexShader(const vec3& v, glm::ivec2& p);
 
 
 int main(int argc, char *argv[]) {
@@ -67,8 +61,8 @@ int main(int argc, char *argv[]) {
 
 	auto cornellBoxScene = Scene(
 		std::vector<ModelInstance> { ModelInstance(Model("Resources/cornell_box.obj")) },
-		std::vector<Light> { Light { vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
-		Camera { glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f });
+		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
+		Camera{ glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f });
 
 	auto cornellBoxTransparentScene = Scene(
 		std::vector<ModelInstance> { ModelInstance(Model("Resources/cornell_box_transparency.obj")) },
@@ -76,12 +70,12 @@ int main(int argc, char *argv[]) {
 		Camera{ glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f });
 
 	auto bunnyBoxScene = Scene(
-		std::vector<ModelInstance> { 
-			ModelInstance(Model("Resources/cornell_box_empty.obj")),
-			ModelInstance(Model("Resources/bunny_transparent.obj"), glm::vec3(0.0f, -1.5f, 0.0f), glm::vec3(12.0f, 12.0f, 12.0f)) 
-		},
+		std::vector<ModelInstance> {
+		ModelInstance(Model("Resources/cornell_box_empty.obj")),
+			ModelInstance(Model("Resources/bunny_transparent.obj"), glm::vec3(0.0f, -1.5f, 0.0f), glm::vec3(12.0f, 12.0f, 12.0f))
+	},
 		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
-		Camera{ glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f });
+			Camera{ glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f });
 
 #ifdef IMPORT_COMPLEX_MODELS
 	auto bunnyScene = Scene(
@@ -90,17 +84,17 @@ int main(int argc, char *argv[]) {
 		Light{ vec3(0.0f, 0.5f, -1.0f), 15.0f * vec3(1,1,1) },
 			Light{ vec3(0.5f, 0.1f, 0.0f), 15.0f * vec3(1,1,1) }},
 		Camera{ glm::vec3(0.0f, 0.1f, -0.15f), 0.0f, 0.0f, 0.0f });
-	
+
 	auto teapotScene = Scene(
 		std::vector<ModelInstance> {
-			ModelInstance(Model("Resources/teapot.obj"), glm::vec3(-3.0f, 0.0f, 0.0f)),
+		ModelInstance(Model("Resources/teapot.obj"), glm::vec3(-3.0f, 0.0f, 0.0f)),
 			ModelInstance(Model("Resources/cube.obj"), glm::vec3(3.0f, 0.0f, 0.0f))
-		},
+	},
 		std::vector<Light> {
 			Light{ vec3(3.0f, 2.0f, 0.0f), 100.0f * vec3(1,1,1) },
-			Light{ vec3(-3.0f, 4.0f, 2.0f), 100.0f * vec3(1,1,1) },
-			Light{ vec3(-3.0f, 4.0f, -2.0f), 30.0f * vec3(1,1,1) }},
-		Camera{ glm::vec3(0.0f, 4.0f, -7.0f), 30.0f, 0.0f, 0.0f });
+				Light{ vec3(-3.0f, 4.0f, 2.0f), 100.0f * vec3(1,1,1) },
+				Light{ vec3(-3.0f, 4.0f, -2.0f), 30.0f * vec3(1,1,1) }},
+			Camera{ glm::vec3(0.0f, 4.0f, -7.0f), 30.0f, 0.0f, 0.0f });
 #endif
 
 	Scene &scene = bunnyBoxScene;
@@ -119,30 +113,30 @@ int main(int argc, char *argv[]) {
 
 void Draw(Scene &scene, const vector<Triangle> &triangles)
 {
-	if( SDL_MUSTLOCK(screen) )
+	if (SDL_MUSTLOCK(screen))
 		SDL_LockSurface(screen);
 
 
-	for( int i=0; i<triangles.size(); ++i )
+	for (int i = 0; i < triangles.size(); ++i)
 	{
 		vector<vec3> vertices(3);
 		vertices[0] = triangles[i].v0;
 		vertices[1] = triangles[i].v1;
 		vertices[2] = triangles[i].v2;
-		for(int v=0; v<3; ++v)
+		for (int v = 0; v < 3; ++v)
 		{
 			glm::ivec2 projPos;
-			VertexShader( vertices[v], projPos );
-			vec3 color(1,1,1);
-			PutPixelSDL( screen, projPos.x, projPos.y, color );
+			VertexShader(vertices[v], projPos);
+			vec3 color(1, 1, 1);
+			PutPixelSDL(screen, projPos.x, projPos.y, color);
 		}
 	}
-	if ( SDL_MUSTLOCK(screen) )
+	if (SDL_MUSTLOCK(screen))
 		SDL_UnlockSurface(screen);
-	SDL_UpdateRect( screen, 0, 0, 0, 0 );
+	SDL_UpdateRect(screen, 0, 0, 0, 0);
 }
 
-void VertexShader( const vec3& v, glm::ivec2& p )
+void VertexShader(const vec3& v, glm::ivec2& p)
 {
 
 }
