@@ -17,6 +17,8 @@
 
 #define EDGE_AA
 
+#define MAX(x, y) ((x) > (y)) ? (x - 1) : (1)
+
 #if defined _WIN32 || defined _WIN64
 extern "C" {
 	FILE __iob_func[3] = { stdin, stdout,*stderr };
@@ -28,6 +30,7 @@ extern "C" {
 
 using glm::vec3;
 using glm::mat3;
+using glm::ivec2;
 
 const int SCREEN_WIDTH = 500;
 const int SCREEN_HEIGHT = 500;
@@ -42,9 +45,13 @@ void Update(Scene &scene, Uint8 &lightSelected);
 void Draw(Scene &scene, const std::vector<Triangle> &triangles);
 
 void Interpolate(float a, float b, std::vector<float> &result);
+void Interpolate( ivec2 a, ivec2 b, std::vector<ivec2>& result );
 
-void VertexShader(const vec3& v, Scene &scene, glm::ivec2& p);
+void VertexShader(const vec3& v, Scene &scene, ivec2& p);
 
+void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color );
+
+void DrawPolygonEdges( const std::vector<vec3>& vertices, Scene &scene );
 
 int main(int argc, char *argv[]) {
 	screen = InitializeSDL(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -111,26 +118,43 @@ int main(int argc, char *argv[]) {
 
 void Draw(Scene &scene, const std::vector<Triangle> &triangles)
 {
+	SDL_FillRect(screen, 0, 0);
 	if (SDL_MUSTLOCK(screen))
 		SDL_LockSurface(screen);
 
-	glm::ivec2 projPos;
 	for (auto triangle : triangles)
 	{
-		for (auto vertex : { triangle.v0, triangle.v1, triangle.v2 })
-		{
-			VertexShader(vertex, scene, projPos);
-			if (projPos.x >= 0 && projPos.x < SCREEN_WIDTH && projPos.y >= 0 && projPos.y < SCREEN_WIDTH) {
-				PutPixelSDL(screen, projPos.x, projPos.y, triangle.color);
-			}
-		}
+		std::vector<vec3> vertices(3);
+		vertices[0] = triangle.v0;
+		vertices[1] = triangle.v1;
+		vertices[2] = triangle.v2;
+
+		DrawPolygonEdges( vertices, scene );
 	}
 	if (SDL_MUSTLOCK(screen))
 		SDL_UnlockSurface(screen);
 	SDL_UpdateRect(screen, 0, 0, 0, 0);
 }
 
-void VertexShader(const vec3& world_vertex, Scene &scene, glm::ivec2& p)
+void DrawPolygonEdges( const std::vector<vec3>& vertices, Scene &scene )
+{
+	int V = vertices.size();
+	// Transform each vertex from 3D world position to 2D image position:
+	std::vector<ivec2> projectedVertices( V );
+	for( int i=0; i<V; ++i )
+	{
+		VertexShader( vertices[i], scene, projectedVertices[i] );
+	}
+	// Loop over all vertices and draw the edge from it to the next vertex:
+	for( int i=0; i<V; ++i )
+	{
+		int j = (i+1)%V; // The next vertex
+		vec3 color( 1, 1, 1 );
+		DrawLineSDL( screen, projectedVertices[i], projectedVertices[j], color );
+	}
+}
+
+void VertexShader(const vec3& world_vertex, Scene &scene, ivec2& p)
 {
 	// Convert the world-space vertex into a camera-space vertex
 	vec3 camera_vertex = world_vertex - scene.camera_.position;
@@ -138,8 +162,33 @@ void VertexShader(const vec3& world_vertex, Scene &scene, glm::ivec2& p)
 	camera_vertex = glm::rotate(camera_vertex, glm::radians(scene.camera_.yaw), vec3(0.0f, 1.0f, 0.0f));
 	camera_vertex = glm::rotate(camera_vertex, glm::radians(scene.camera_.roll), vec3(0.0f, 0.0f, 1.0f));
 
-	p.x = SCREEN_WIDTH * (scene.camera_.focal_length * camera_vertex.x / camera_vertex.z + 1.0f / 2.0f);
-	p.y = SCREEN_WIDTH * (-scene.camera_.focal_length * camera_vertex.y / camera_vertex.z + 1.0f / 2.0f);
+	p.x = SCREEN_WIDTH *  ( scene.camera_.focal_length * camera_vertex.x / camera_vertex.z + 1.0f / 2.0f);
+	p.y = SCREEN_HEIGHT * (-scene.camera_.focal_length * camera_vertex.y / camera_vertex.z + 1.0f / 2.0f);
+}
+
+void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color )
+{
+	ivec2 delta = glm::abs( a - b );
+	int pixels = glm::max( delta.x, delta.y ) + 1;
+	std::vector<ivec2> line( pixels );
+	Interpolate( a, b, line );
+	for(auto pixel : line)
+	{
+		PutPixelSDL(screen, pixel.x, pixel.y, color);
+	}
+}
+
+
+void Interpolate( ivec2 a, ivec2 b, std::vector<ivec2>& result )
+{
+	int N = result.size();
+	glm::vec2 step = glm::vec2(b-a) / static_cast<float>( MAX(N-1, 1) );
+	glm::vec2 current( a );
+	for( int i=0; i<N; ++i )
+	{
+		result[i] = current;
+		current += step;
+	}
 }
 
 void Interpolate(float a, float b, std::vector<float> &result) {
