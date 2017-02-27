@@ -17,8 +17,6 @@
 
 #define EDGE_AA
 
-#define MAX(x, y) ((x) > (y)) ? (x - 1) : (1)
-
 #if defined _WIN32 || defined _WIN64
 extern "C" {
 	FILE __iob_func[3] = { stdin, stdout,*stderr };
@@ -50,8 +48,15 @@ void Interpolate( ivec2 a, ivec2 b, std::vector<ivec2>& result );
 void VertexShader(const vec3& v, Scene &scene, ivec2& p);
 
 void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color );
+void ComputeLine( SDL_Surface* surface, ivec2 a, ivec2 b, std::vector<ivec2> &line );
 
 void DrawPolygonEdges( const std::vector<vec3>& vertices, Scene &scene );
+
+void DrawPolygonRows( const std::vector<ivec2>& leftPixels, const std::vector<ivec2>& rightPixels, vec3 color );
+
+void DrawPolygon( const std::vector<vec3>& vertices, vec3 color, Scene& scene );
+
+void ComputePolygonRows(const std::vector<ivec2>& vertexPixels, std::vector<ivec2>& leftPixels, std::vector<ivec2>& rightPixels );
 
 int main(int argc, char *argv[]) {
 	screen = InitializeSDL(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -107,6 +112,25 @@ int main(int argc, char *argv[]) {
 	std::vector<Triangle> sceneTris = scene.ToTriangles();
 	std::cout << "Loaded " << sceneTris.size() << " tris" << std::endl;
 
+
+
+	// std::vector<ivec2> vertexPixels(3);
+	// vertexPixels[0] = ivec2(10, 5);
+	// vertexPixels[1] = ivec2( 5,10);
+	// vertexPixels[2] = ivec2(15,15);
+	// std::vector<ivec2> leftPixels;
+	// std::vector<ivec2> rightPixels;
+	// ComputePolygonRows( vertexPixels, leftPixels, rightPixels );
+	// for( int row=0; row<leftPixels.size(); ++row )
+	// {
+	// 	std::cout << "Start: ("
+	// 	<< leftPixels[row].x << ","
+	// 	<< leftPixels[row].y << "). "
+	// 	<< "End: ("
+	// 	<< rightPixels[row].x << ","
+	// 	<< rightPixels[row].y << "). " << std::endl;
+	// }
+
 	while (NoQuitMessageSDL()) {
 		Draw(scene, sceneTris);
 		Update(scene, lightSelected);
@@ -129,11 +153,84 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles)
 		vertices[1] = triangle.v1;
 		vertices[2] = triangle.v2;
 
-		DrawPolygonEdges( vertices, scene );
+		DrawPolygon( vertices, triangle.color, scene );
 	}
 	if (SDL_MUSTLOCK(screen))
 		SDL_UnlockSurface(screen);
 	SDL_UpdateRect(screen, 0, 0, 0, 0);
+}
+
+void DrawPolygon( const std::vector<vec3>& vertices, vec3 color, Scene& scene )
+{
+	int V = vertices.size();
+	std::vector<ivec2> vertexPixels( V );
+	for( int i=0; i<V; ++i )
+	{
+
+		VertexShader( vertices[i], scene, vertexPixels[i]);
+	}
+
+	std::vector<ivec2> leftPixels;
+	std::vector<ivec2> rightPixels;
+	ComputePolygonRows( vertexPixels, leftPixels, rightPixels );
+	DrawPolygonRows( leftPixels, rightPixels, color );
+}
+
+void DrawPolygonRows( const std::vector<ivec2>& leftPixels, const std::vector<ivec2>& rightPixels, vec3 color )
+{
+	for(int j = 0; j < leftPixels.size(); j++)
+	{
+		for(int x = leftPixels[j].x; x <= rightPixels[j].x; x++)
+		{
+			PutPixelSDL(screen, x, leftPixels[j].y, color);
+		}
+	}
+}
+
+void ComputePolygonRows(const std::vector<ivec2>& vertexPixels, std::vector<ivec2>& leftPixels, std::vector<ivec2>& rightPixels )
+{
+// 1. Find max and min y-value of the polygon
+// and compute the number of rows it occupies.
+// 2. Resize leftPixels and rightPixels
+// so that they have an element for each row.
+// 3. Initialize the x-coordinates in leftPixels
+// to some really large value and the x-coordinates
+// in rightPixels to some really small value.
+	
+	int miny = std::numeric_limits<int>::max();
+	int maxy = std::numeric_limits<int>::min();
+	for(auto vertex : vertexPixels)
+	{
+		miny = std::min(vertex.y, miny);
+		maxy = std::max(vertex.y, maxy);
+	}
+	int size = maxy - miny + 1;
+	//initialise rows
+	leftPixels.resize(size);
+	rightPixels.resize(size);
+	for( int i=0; i<size; ++i )
+	{
+		leftPixels[i].x =  std::numeric_limits<int>::max();
+		rightPixels[i].x = std::numeric_limits<int>::min();
+		leftPixels[i].y  = miny + i; 
+		rightPixels[i].y = miny + i;
+	}
+// 4. Loop through all edges of the polygon and use
+// linear interpolation to find the x-coordinate for
+// each row it occupies. Update the corresponding
+// values in rightPixels and leftPixels.
+	for( int i=0; i<vertexPixels.size(); ++i )
+	{
+		int j = (i+1)%vertexPixels.size(); // The next vertex
+		std::vector<ivec2> line;
+		ComputeLine( screen, vertexPixels[i], vertexPixels[j], line );
+		for(auto linePixel : line)
+		{
+			int y = linePixel.y - miny;
+			leftPixels[y].x  = std::min(leftPixels[y].x,  linePixel.x);
+			rightPixels[y].x = std::max(rightPixels[y].x, linePixel.x);
+		}
+	}
 }
 
 void DrawPolygonEdges( const std::vector<vec3>& vertices, Scene &scene )
@@ -167,22 +264,28 @@ void VertexShader(const vec3& world_vertex, Scene &scene, ivec2& p)
 }
 
 void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color )
-{
-	ivec2 delta = glm::abs( a - b );
-	int pixels = glm::max( delta.x, delta.y ) + 1;
-	std::vector<ivec2> line( pixels );
-	Interpolate( a, b, line );
+{	
+	std::vector<ivec2> line;
+	ComputeLine(screen, a, b, line);
 	for(auto pixel : line)
 	{
 		PutPixelSDL(screen, pixel.x, pixel.y, color);
 	}
 }
 
+void ComputeLine( SDL_Surface* surface, ivec2 a, ivec2 b, std::vector<ivec2> &line )
+{
+	ivec2 delta = glm::abs( a - b );
+	int pixels = glm::max( delta.x, delta.y ) + 1;
+	line.resize(pixels);
+	Interpolate( a, b, line );
+}
+
 
 void Interpolate( ivec2 a, ivec2 b, std::vector<ivec2>& result )
 {
 	int N = result.size();
-	glm::vec2 step = glm::vec2(b-a) / static_cast<float>( MAX(N-1, 1) );
+	glm::vec2 step = glm::vec2(b-a) / static_cast<float>( std::max(N-1, 1) );
 	glm::vec2 current( a );
 	for( int i=0; i<N; ++i )
 	{
