@@ -217,3 +217,5 @@ fabric.properties
 
 
 screenshot\.bmp
+*.swp
+.vscode/
