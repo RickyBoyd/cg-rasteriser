@@ -26,8 +26,6 @@ extern "C" {
 }
 #endif
 
-
-using namespace std;
 using glm::vec3;
 using glm::mat3;
 
@@ -41,11 +39,11 @@ const float FOCAL_LENGTH = SCREEN_WIDTH / 2;
 
 void Update(Scene &scene, Uint8 &lightSelected);
 
-void Draw(Scene &scene, const vector<Triangle> &triangles);
+void Draw(Scene &scene, const std::vector<Triangle> &triangles);
 
-void Interpolate(float a, float b, vector<float> &result);
+void Interpolate(float a, float b, std::vector<float> &result);
 
-void VertexShader(const vec3& v, glm::ivec2& p);
+void VertexShader(const vec3& v, Scene &scene, glm::ivec2& p);
 
 
 int main(int argc, char *argv[]) {
@@ -57,18 +55,19 @@ int main(int argc, char *argv[]) {
 	auto cubeScene = Scene(
 		std::vector<ModelInstance> { ModelInstance(Model("Resources/cube.obj")) },
 		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
-		Camera{ glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f });
+		Camera{ glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f, 1.0f });
 
 	auto cornellBoxScene = Scene(
 		std::vector<ModelInstance> { ModelInstance(Model("Resources/cornell_box.obj")) },
 		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
-		Camera{ glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f });
+		Camera{ glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f, 0.4f });
 
 	auto cornellBoxTransparentScene = Scene(
 		std::vector<ModelInstance> { ModelInstance(Model("Resources/cornell_box_transparency.obj")) },
 		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
-		Camera{ glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f });
+		Camera{ glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f, 1.0f });
 
+#ifdef IMPORT_COMPLEX_MODELS
 	auto bunnyBoxScene = Scene(
 		std::vector<ModelInstance> {
 		ModelInstance(Model("Resources/cornell_box_empty.obj")),
@@ -77,7 +76,6 @@ int main(int argc, char *argv[]) {
 		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
 			Camera{ glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f });
 
-#ifdef IMPORT_COMPLEX_MODELS
 	auto bunnyScene = Scene(
 		std::vector<ModelInstance> { ModelInstance(Model("Resources/bunny.obj"), glm::vec3(0.0f, 0.0f, 0.0f)) },
 		std::vector<Light> {
@@ -97,10 +95,10 @@ int main(int argc, char *argv[]) {
 			Camera{ glm::vec3(0.0f, 4.0f, -7.0f), 30.0f, 0.0f, 0.0f });
 #endif
 
-	Scene &scene = bunnyBoxScene;
+	Scene &scene = cornellBoxScene;
 
 	std::vector<Triangle> sceneTris = scene.ToTriangles();
-	cout << "Loaded " << sceneTris.size() << " tris" << endl;
+	std::cout << "Loaded " << sceneTris.size() << " tris" << std::endl;
 
 	while (NoQuitMessageSDL()) {
 		Draw(scene, sceneTris);
@@ -111,24 +109,20 @@ int main(int argc, char *argv[]) {
 	return 0;
 }
 
-void Draw(Scene &scene, const vector<Triangle> &triangles)
+void Draw(Scene &scene, const std::vector<Triangle> &triangles)
 {
 	if (SDL_MUSTLOCK(screen))
 		SDL_LockSurface(screen);
 
-
-	for (int i = 0; i < triangles.size(); ++i)
+	glm::ivec2 projPos;
+	for (auto triangle : triangles)
 	{
-		vector<vec3> vertices(3);
-		vertices[0] = triangles[i].v0;
-		vertices[1] = triangles[i].v1;
-		vertices[2] = triangles[i].v2;
-		for (int v = 0; v < 3; ++v)
+		for (auto vertex : { triangle.v0, triangle.v1, triangle.v2 })
 		{
-			glm::ivec2 projPos;
-			VertexShader(vertices[v], projPos);
-			vec3 color(1, 1, 1);
-			PutPixelSDL(screen, projPos.x, projPos.y, color);
+			VertexShader(vertex, scene, projPos);
+			if (projPos.x >= 0 && projPos.x < SCREEN_WIDTH && projPos.y >= 0 && projPos.y < SCREEN_WIDTH) {
+				PutPixelSDL(screen, projPos.x, projPos.y, triangle.color);
+			}
 		}
 	}
 	if (SDL_MUSTLOCK(screen))
@@ -136,12 +130,19 @@ void Draw(Scene &scene, const vector<Triangle> &triangles)
 	SDL_UpdateRect(screen, 0, 0, 0, 0);
 }
 
-void VertexShader(const vec3& v, glm::ivec2& p)
+void VertexShader(const vec3& world_vertex, Scene &scene, glm::ivec2& p)
 {
+	// Convert the world-space vertex into a camera-space vertex
+	vec3 camera_vertex = world_vertex - scene.camera_.position;
+	camera_vertex = glm::rotate(camera_vertex, glm::radians(scene.camera_.pitch), vec3(1.0f, 0.0f, 0.0f));
+	camera_vertex = glm::rotate(camera_vertex, glm::radians(scene.camera_.yaw), vec3(0.0f, 1.0f, 0.0f));
+	camera_vertex = glm::rotate(camera_vertex, glm::radians(scene.camera_.roll), vec3(0.0f, 0.0f, 1.0f));
 
+	p.x = SCREEN_WIDTH * (scene.camera_.focal_length * camera_vertex.x / camera_vertex.z + 1.0f / 2.0f);
+	p.y = SCREEN_WIDTH * (-scene.camera_.focal_length * camera_vertex.y / camera_vertex.z + 1.0f / 2.0f);
 }
 
-void Interpolate(float a, float b, vector<float> &result) {
+void Interpolate(float a, float b, std::vector<float> &result) {
 	if (result.size() == 0) return;
 	if (result.size() == 1) {
 		result[0] = (a + b) / 2;
@@ -162,7 +163,7 @@ void Update(Scene &scene, Uint8 &lightSelected) {
 	int t2 = SDL_GetTicks();
 	float dt = float(t2 - t);
 	t = t2;
-	cout << "Render time: " << dt << " ms.\n";
+	std::cout << "Render time: " << dt << " ms.\n";
 
 	static float movementSpeed = 0.001;
 	static float rotateSpeed = 0.01;

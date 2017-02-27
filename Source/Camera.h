@@ -7,5 +7,6 @@ struct Camera
 	float pitch;
 	float yaw;
 	float roll;
+	float focal_length;
 };
 
