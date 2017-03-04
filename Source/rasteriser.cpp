@@ -236,8 +236,23 @@ void ComputePolygonRows(const std::vector<Pixel>& vertexPixels, std::vector<Pixe
 		for(auto linePixel : line)
 		{
 			int y = linePixel.y - miny;
-			leftPixels[y].x  = std::min(leftPixels[y].x,  linePixel.x);
-			rightPixels[y].x = std::max(rightPixels[y].x, linePixel.x);
+			if(y >= leftPixels.size())
+			{
+				std::cout << "y is greater that right left.size() \n";
+				std::cout << "y: " << y << std::endl;
+				std::cout << "size: " << leftPixels.size() << std::endl;
+				if(y >= rightPixels.size())
+				{
+					std::cout << "y is greater that right pixels.size() \n";
+					std::cout << "y: " << y << std::endl;
+					std::cout << "size: " << rightPixels.size() << std::endl;
+				}
+			} 
+			else
+			{
+				leftPixels[y].x  = std::min(leftPixels[y].x,  linePixel.x);
+				rightPixels[y].x = std::max(rightPixels[y].x, linePixel.x);
+			}
 		}
 	}
 }
