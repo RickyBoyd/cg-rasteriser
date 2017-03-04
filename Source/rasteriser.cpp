@@ -26,6 +26,13 @@ extern "C" {
 }
 #endif
 
+struct Pixel
+{
+	int x;
+	int y;
+	float z_inv;
+};
+
 using glm::vec3;
 using glm::mat3;
 using glm::ivec2;
@@ -45,18 +52,18 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles);
 void Interpolate(float a, float b, std::vector<float> &result);
 void Interpolate( ivec2 a, ivec2 b, std::vector<ivec2>& result );
 
-void VertexShader(const vec3& v, Scene &scene, ivec2& p);
+void VertexShader(const vec3& v, Scene &scene, Pixel& p);
 
 void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color );
 void ComputeLine( SDL_Surface* surface, ivec2 a, ivec2 b, std::vector<ivec2> &line );
 
 void DrawPolygonEdges( const std::vector<vec3>& vertices, Scene &scene );
 
-void DrawPolygonRows( const std::vector<ivec2>& leftPixels, const std::vector<ivec2>& rightPixels, vec3 color );
+void DrawPolygonRows( const std::vector<Pixel>& leftPixels, const std::vector<Pixel>& rightPixels, vec3 color );
 
 void DrawPolygon( const std::vector<vec3>& vertices, vec3 color, Scene& scene );
 
-void ComputePolygonRows(const std::vector<ivec2>& vertexPixels, std::vector<ivec2>& leftPixels, std::vector<ivec2>& rightPixels );
+void ComputePolygonRows(const std::vector<Pixel>& vertexPixels, std::vector<Pixel>& leftPixels, std::vector<Pixel>& rightPixels );
 
 int main(int argc, char *argv[]) {
 	screen = InitializeSDL(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -163,20 +170,20 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles)
 void DrawPolygon( const std::vector<vec3>& vertices, vec3 color, Scene& scene )
 {
 	int V = vertices.size();
-	std::vector<ivec2> vertexPixels( V );
+	std::vector<Pixel> vertexPixels( V );
 	for( int i=0; i<V; ++i )
 	{
 
 		VertexShader( vertices[i], scene, vertexPixels[i]);
 	}
 
-	std::vector<ivec2> leftPixels;
-	std::vector<ivec2> rightPixels;
+	std::vector<Pixel> leftPixels;
+	std::vector<Pixel> rightPixels;
 	ComputePolygonRows( vertexPixels, leftPixels, rightPixels );
 	DrawPolygonRows( leftPixels, rightPixels, color );
 }
 
-void DrawPolygonRows( const std::vector<ivec2>& leftPixels, const std::vector<ivec2>& rightPixels, vec3 color )
+void DrawPolygonRows( const std::vector<Pixel>& leftPixels, const std::vector<Pixel>& rightPixels, vec3 color )
 {
 	for(int j = 0; j < leftPixels.size(); j++)
 	{
@@ -187,7 +194,7 @@ void DrawPolygonRows( const std::vector<ivec2>& leftPixels, const std::vector<iv
 	}
 }
 
-void ComputePolygonRows(const std::vector<ivec2>& vertexPixels, std::vector<ivec2>& leftPixels, std::vector<ivec2>& rightPixels )
+void ComputePolygonRows(const std::vector<Pixel>& vertexPixels, std::vector<Pixel>& leftPixels, std::vector<Pixel>& rightPixels )
 {
 // 1. Find max and min y-value of the polygon
 // and compute the number of rows it occupies.
@@ -223,7 +230,9 @@ void ComputePolygonRows(const std::vector<ivec2>& vertexPixels, std::vector<ivec
 	{
 		int j = (i+1)%vertexPixels.size(); // The next vertex
 		std::vector<ivec2> line;
-		ComputeLine( screen, vertexPixels[i], vertexPixels[j], line );
+		ivec2 v_i( vertexPixels[i].x, vertexPixels[i].y);
+		ivec2 v_j(  vertexPixels[j].x,  vertexPixels[j].y);
+		ComputeLine( screen, v_i, v_j, line );
 		for(auto linePixel : line)
 		{
 			int y = linePixel.y - miny;
@@ -233,25 +242,25 @@ void ComputePolygonRows(const std::vector<ivec2>& vertexPixels, std::vector<ivec
 	}
 }
 
-void DrawPolygonEdges( const std::vector<vec3>& vertices, Scene &scene )
-{
-	int V = vertices.size();
-	// Transform each vertex from 3D world position to 2D image position:
-	std::vector<ivec2> projectedVertices( V );
-	for( int i=0; i<V; ++i )
-	{
-		VertexShader( vertices[i], scene, projectedVertices[i] );
-	}
-	// Loop over all vertices and draw the edge from it to the next vertex:
-	for( int i=0; i<V; ++i )
-	{
-		int j = (i+1)%V; // The next vertex
-		vec3 color( 1, 1, 1 );
-		DrawLineSDL( screen, projectedVertices[i], projectedVertices[j], color );
-	}
-}
+// void DrawPolygonEdges( const std::vector<vec3>& vertices, Scene &scene )
+// {
+// 	int V = vertices.size();
+// 	// Transform each vertex from 3D world position to 2D image position:
+// 	std::vector<ivec2> projectedVertices( V );
+// 	for( int i=0; i<V; ++i )
+// 	{
+// 		VertexShader( vertices[i], scene, projectedVertices[i] );
+// 	}
+// 	// Loop over all vertices and draw the edge from it to the next vertex:
+// 	for( int i=0; i<V; ++i )
+// 	{
+// 		int j = (i+1)%V; // The next vertex
+// 		vec3 color( 1, 1, 1 );
+// 		DrawLineSDL( screen, projectedVertices[i], projectedVertices[j], color );
+// 	}
+// }
 
-void VertexShader(const vec3& world_vertex, Scene &scene, ivec2& p)
+void VertexShader(const vec3& world_vertex, Scene &scene, Pixel& p)
 {
 	// Convert the world-space vertex into a camera-space vertex
 	vec3 camera_vertex = world_vertex - scene.camera_.position;
@@ -261,6 +270,7 @@ void VertexShader(const vec3& world_vertex, Scene &scene, ivec2& p)
 
 	p.x = SCREEN_WIDTH *  ( scene.camera_.focal_length * camera_vertex.x / camera_vertex.z + 1.0f / 2.0f);
 	p.y = SCREEN_HEIGHT * (-scene.camera_.focal_length * camera_vertex.y / camera_vertex.z + 1.0f / 2.0f);
+	p.z_inv = camera_vertex.z == 0.0f ? std::numeric_limits<float>::max() : 1.0f/camera_vertex.z;
 }
 
 void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color )
