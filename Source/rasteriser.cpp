@@ -339,7 +339,7 @@ void Interpolate( Pixel a, Pixel b, std::vector<Pixel>& result )
 	glm::vec3 current( a_vec );
 	for( int i=0; i<N; ++i )
 	{
-		result[i] = {current.x, current.y, current.z};
+		result[i] = {int(current.x), int(current.y), current.z};
 		current += step;
 	}
 }
