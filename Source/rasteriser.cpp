@@ -14,6 +14,7 @@
 #include "Light.h"
 #include "Scene.h"
 #include "Material.h"
+#include "Utilities.h"
 
 #define EDGE_AA
 
@@ -32,13 +33,6 @@ extern "C" {
 #include <crtdbg.h>	
 #endif
 
-struct Pixel
-{
-	int x;
-	int y;
-	float z_inv;
-};
-
 using glm::vec3;
 using glm::mat3;
 using glm::ivec2;
@@ -55,21 +49,13 @@ void Update(Scene &scene, Uint8 &lightSelected);
 
 void Draw(Scene &scene, const std::vector<Triangle> &triangles, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT]);
 
-void Interpolate(float a, float b, std::vector<float> &result);
-void Interpolate( ivec2 a, ivec2 b, std::vector<ivec2>& result );
-void Interpolate( Pixel a, Pixel b, std::vector<Pixel>& result );
-
 void VertexShader(const vec3& v, Scene &scene, Pixel& p);
 
-//void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color );
 void ComputeLine( Pixel a, Pixel b, std::vector<Pixel> &line );
 
-void DrawPolygonEdges( const std::vector<vec3>& vertices, Scene &scene, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT] );
-
+void DrawPolygonEdges(const std::vector<vec3>& vertices, Scene &scene);
 void DrawPolygonRows( const std::vector<Pixel>& leftPixels, const std::vector<Pixel>& rightPixels, vec3 color, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT] );
-
 void DrawPolygon( const std::vector<vec3>& vertices, vec3 color, Scene& scene, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT] );
-
 void ComputePolygonRows(const std::vector<Pixel>& vertexPixels, std::vector<Pixel>& leftPixels, std::vector<Pixel>& rightPixels );
 
 int main(int argc, char *argv[]) {
@@ -162,6 +148,7 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles, float depth_buff
 		vertices[2] = triangle.v2;
 
 		DrawPolygon( vertices, triangle.color, scene, depth_buffer );
+		//DrawPolygonEdges(vertices, scene);
 	}
 	if (SDL_MUSTLOCK(screen))
 		SDL_UnlockSurface(screen);
@@ -192,12 +179,12 @@ void DrawPolygonRows( const std::vector<Pixel>& leftPixels, const std::vector<Pi
 		ComputeLine(leftPixels[j], rightPixels[j], row);
 		for(Pixel pixel : row)
 		{
-			if(pixel.x >= 0 && pixel.x <= SCREEN_WIDTH && pixel.y >= 0 && pixel.y< SCREEN_HEIGHT)
+			if(pixel.pos.x >= 0 && pixel.pos.x <= SCREEN_WIDTH && pixel.pos.y >= 0 && pixel.pos.y < SCREEN_HEIGHT)
 			{
-				if(pixel.z_inv > depth_buffer[pixel.x][pixel.y])
+				if(pixel.z_inv > depth_buffer[pixel.pos.x][pixel.pos.y])
 				{
-					depth_buffer[pixel.x][pixel.y] = pixel.z_inv;
-					PutPixelSDL(screen, pixel.x, pixel.y, color);
+					depth_buffer[pixel.pos.x][pixel.pos.y] = pixel.z_inv;
+					PutPixelSDL(screen, pixel.pos.x, pixel.pos.y, color);
 				}
 			}
 		}
@@ -213,8 +200,8 @@ void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pix
 
 	for (auto vertex : vertex_pixels)
 	{
-		min_y = std::min(vertex.y, min_y);
-		max_y = std::max(vertex.y, max_y);
+		min_y = std::min(vertex.pos.y, min_y);
+		max_y = std::max(vertex.pos.y, max_y);
 	}
 	int rows = max_y - min_y + 1;
 
@@ -225,10 +212,10 @@ void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pix
 	// 3. Initialize the x-coordinates in left_pixels to some really large value and the x-coordinates in right_pixels to some really small value.
 	for (int row = 0; row < rows; ++row)
 	{
-		left_pixels[row].x = std::numeric_limits<int>::max();
-		right_pixels[row].x = std::numeric_limits<int>::min();
-		left_pixels[row].y = min_y + row;
-		right_pixels[row].y = min_y + row;
+		left_pixels[row].pos.x = std::numeric_limits<int>::max();
+		right_pixels[row].pos.x = std::numeric_limits<int>::min();
+		left_pixels[row].pos.y = min_y + row;
+		right_pixels[row].pos.y = min_y + row;
 	}
 
 	// 4. Loop through all edges of the polygon and use linear interpolation to find the x-coordinate for
@@ -240,45 +227,47 @@ void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pix
 		ComputeLine(vertex_pixels[i], vertex_pixels[j], line);
 		for (auto line_pixel : line)
 		{
-			int row = line_pixel.y - min_y;
+			int row = line_pixel.pos.y - min_y;
 			if (row >= rows)
 			{
 				std::cout << "row (" << row << ") is greater than number of rows (" << rows << ")" << std::endl;
 			}
 			else
 			{
-				if (line_pixel.x < left_pixels[row].x)
+				if (line_pixel.pos.x < left_pixels[row].pos.x)
 				{
 					left_pixels[row].z_inv = line_pixel.z_inv;
-					left_pixels[row].x = line_pixel.x;
+					left_pixels[row].pos.x = line_pixel.pos.x;
 				}
-				if (line_pixel.x > right_pixels[row].x)
+				if (line_pixel.pos.x > right_pixels[row].pos.x)
 				{
 					right_pixels[row].z_inv = line_pixel.z_inv;
-					right_pixels[row].x = line_pixel.x;
+					right_pixels[row].pos.x = line_pixel.pos.x;
 				}
 			}
 		}
 	}
 }
 
-// void DrawPolygonEdges( const std::vector<vec3>& vertices, Scene &scene )
-// {
-// 	int V = vertices.size();
-// 	// Transform each vertex from 3D world position to 2D image position:
-// 	std::vector<ivec2> projectedVertices( V );
-// 	for( int i=0; i<V; ++i )
-// 	{
-// 		VertexShader( vertices[i], scene, projectedVertices[i] );
-// 	}
-// 	// Loop over all vertices and draw the edge from it to the next vertex:
-// 	for( int i=0; i<V; ++i )
-// 	{
-// 		int j = (i+1)%V; // The next vertex
-// 		vec3 color( 1, 1, 1 );
-// 		DrawLineSDL( screen, projectedVertices[i], projectedVertices[j], color );
-// 	}
-// }
+void DrawPolygonEdges(const std::vector<vec3>& vertices, Scene &scene)
+{
+	// Transform each vertex from 3D world position to 2D image position:
+	std::vector<Pixel> pixels(vertices.size());
+	std::transform(vertices.begin(), vertices.end(), pixels.begin(), [&scene](vec3 vertex) -> Pixel
+	{
+		Pixel p;
+		VertexShader(vertex, scene, p);
+		return p;
+	});
+	// Loop over all vertices and draw the edge from it to the next vertex:
+	int num_vertices = vertices.size();
+	for (int i = 0; i < num_vertices; ++i)
+	{
+		int j = (i + 1) % num_vertices; // The next vertex
+		vec3 color(1, 1, 1);
+		DrawLineSDL(screen, pixels[i].pos, pixels[j].pos, color);
+	}
+}
 
 void VertexShader(const vec3& world_vertex, Scene &scene, Pixel& p)
 {
@@ -288,74 +277,18 @@ void VertexShader(const vec3& world_vertex, Scene &scene, Pixel& p)
 	camera_vertex = glm::rotate(camera_vertex, glm::radians(scene.camera_.yaw), vec3(0.0f, 1.0f, 0.0f));
 	camera_vertex = glm::rotate(camera_vertex, glm::radians(scene.camera_.roll), vec3(0.0f, 0.0f, 1.0f));
 
-	p.x = SCREEN_WIDTH *  ( scene.camera_.focal_length * camera_vertex.x / camera_vertex.z + 1.0f / 2.0f);
-	p.y = SCREEN_HEIGHT * (-scene.camera_.focal_length * camera_vertex.y / camera_vertex.z + 1.0f / 2.0f);
+	p.pos.x = SCREEN_WIDTH *  ( scene.camera_.focal_length * camera_vertex.x / camera_vertex.z + 1.0f / 2.0f);
+	p.pos.y = SCREEN_HEIGHT * (-scene.camera_.focal_length * camera_vertex.y / camera_vertex.z + 1.0f / 2.0f);
 	p.z_inv = camera_vertex.z == 0.0f ? std::numeric_limits<float>::max() : 1.0f/camera_vertex.z;
 }
 
-// void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color )
-// {	
-// 	std::vector<ivec2> line;
-// 	ComputeLine(screen, a, b, line);
-// 	for(auto pixel : line)
-// 	{
-// 		PutPixelSDL(screen, pixel.x, pixel.y, color);
-// 	}
-// }
-
 void ComputeLine(Pixel a, Pixel b, std::vector<Pixel> &line)
 {
-	int delta_x = glm::abs(a.x - b.x);
-	int delta_y = glm::abs(a.y - b.y);
+	int delta_x = glm::abs(a.pos.x - b.pos.x);
+	int delta_y = glm::abs(a.pos.y - b.pos.y);
 	int pixels = glm::max(delta_x, delta_y) + 1; // TODO: why +1?
 	line.resize(pixels);
 	Interpolate(a, b, line);
-}
-
-void Interpolate(Pixel a, Pixel b, std::vector<Pixel>& result)
-{
-	int N = result.size();
-	glm::vec3 a_vec(a.x, a.y, a.z_inv);
-	glm::vec3 b_vec(b.x, b.y, b.z_inv);
-	glm::vec3 step = glm::vec3(b_vec - a_vec) / float(std::max(N - 1, 1));
-	glm::vec3 current(a_vec);
-	for (int i = 0; i < N; ++i)
-	{
-		result[i] = { int(round(current.x)), int(round(current.y)), current.z };
-		current += step;
-	}
-}
-
-void Interpolate(ivec2 a, ivec2 b, std::vector<ivec2>& result)
-{
-	int N = result.size();
-	glm::vec2 step = glm::vec2(b - a) / float(std::max(N - 1, 1));
-	glm::vec2 current(a);
-	for (int i = 0; i < N; ++i)
-	{
-		result[i] = current;
-		current += step;
-	}
-}
-
-void Interpolate(float a, float b, std::vector<float> &result)
-{
-	switch (result.size())
-	{
-		case 0:
-			break;
-		case 1:
-			result[0] = (a + b) / 2.0f;
-			break;
-		default:
-			float step = (b - a) / float(result.size() - 1);
-			float current = a;
-			for (int i = 0; i < result.size(); i++) {
-				result[i] = current;
-				current += step;
-			}
-			break;
-	}
 }
 
 void Update(Scene &scene, Uint8 &lightSelected) {

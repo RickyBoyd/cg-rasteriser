@@ -1,4 +1,6 @@
 #include "SDLauxiliary.h"
+#include <vector>
+#include "Utilities.h"
 
 SDL_Surface* InitializeSDL( int width, int height, bool fullscreen )
 {
@@ -50,4 +52,18 @@ void PutPixelSDL( SDL_Surface* surface, int x, int y, glm::vec3 color )
 
 	Uint32* p = (Uint32*)surface->pixels + y*surface->pitch/4 + x;
 	*p = SDL_MapRGB( surface->format, r, g, b );
+}
+
+void DrawLineSDL(SDL_Surface* surface, glm::ivec2 a, glm::ivec2 b, glm::vec3 color)
+{
+	std::vector<glm::ivec2> line;
+	int delta_x = glm::abs(a.x - b.x);
+	int delta_y = glm::abs(a.y - b.y);
+	int pixels = glm::max(delta_x, delta_y) + 1;
+	line.resize(pixels);
+	Interpolate(a, b, line);
+	for (auto pixel : line)
+	{
+		PutPixelSDL(surface, pixel.x, pixel.y, color);
+	}
 }

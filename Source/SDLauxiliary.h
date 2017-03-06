@@ -27,4 +27,6 @@ bool NoQuitMessageSDL();
 // SDL_UpdateRect( surface, 0, 0, 0, 0 );
 void PutPixelSDL( SDL_Surface* surface, int x, int y, glm::vec3 color );
 
+void DrawLineSDL(SDL_Surface* surface, glm::ivec2 a, glm::ivec2 b, glm::vec3 color);
+
 #endif

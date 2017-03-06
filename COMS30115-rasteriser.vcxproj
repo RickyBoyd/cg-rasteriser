@@ -146,22 +146,24 @@
     <ClCompile Include="Source\Face.cpp" />
     <ClCompile Include="Source\Light.cpp" />
     <ClCompile Include="Source\Material.cpp" />
-    <ClCompile Include="source\Model.cpp" />
-    <ClCompile Include="source\rasteriser.cpp" />
+    <ClCompile Include="Source\Model.cpp" />
+    <ClCompile Include="Source\rasteriser.cpp" />
     <ClCompile Include="Source\Scene.cpp" />
     <ClCompile Include="Source\SDLauxiliary.cpp" />
     <ClCompile Include="Source\Triangle.cpp" />
+    <ClCompile Include="Source\Utilities.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Camera.h" />
     <ClInclude Include="Source\Face.h" />
     <ClInclude Include="Source\Light.h" />
     <ClInclude Include="Source\Material.h" />
-    <ClInclude Include="source\Model.h" />
-    <ClInclude Include="source\rasteriser.h" />
+    <ClInclude Include="Source\Model.h" />
+    <ClInclude Include="Source\rasteriser.h" />
     <ClInclude Include="Source\Scene.h" />
-    <ClInclude Include="source\SDLauxiliary.h" />
-    <ClInclude Include="source\Triangle.h" />
+    <ClInclude Include="Source\SDLauxiliary.h" />
+    <ClInclude Include="Source\Triangle.h" />
+    <ClInclude Include="Source\Utilities.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
