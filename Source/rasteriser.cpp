@@ -26,11 +26,11 @@ extern "C" {
 }
 #endif
 
-/*#ifdef _DEBUG
+#if defined(_DEBUG) && (defined _WIN32 || defined _WIN64)
 #define _CRTDBG_MAP_ALLOC
 #include <stdlib.h>
 #include <crtdbg.h>	
-#endif*/
+#endif
 
 struct Pixel
 {
@@ -128,30 +128,14 @@ int main(int argc, char *argv[]) {
 
 	float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT];
 
-	// std::vector<ivec2> vertex_pixels(3);
-	// vertex_pixels[0] = ivec2(10, 5);
-	// vertex_pixels[1] = ivec2( 5,10);
-	// vertex_pixels[2] = ivec2(15,15);
-	// std::vector<ivec2> left_pixels;
-	// std::vector<ivec2> right_pixels;
-	// ComputePolygonRows( vertex_pixels, left_pixels, right_pixels );
-	// for( int row=0; row<left_pixels.size(); ++row )
-	// {
-	// 	std::cout << "Start: ("
-	// 	<< left_pixels[row].x << ","
-	// 	<< left_pixels[row].y << "). "
-	// 	<< "End: ("
-	// 	<< right_pixels[row].x << ","
-	// 	<< right_pixels[row].y << "). " << std::endl;
-	// }
-
 	while (NoQuitMessageSDL()) {
 		Draw(scene, sceneTris, depth_buffer);
 		Update(scene, lightSelected);
 	}
 
 	SDL_SaveBMP(screen, "screenshot.bmp");
-#ifdef _DEBUG
+
+#if defined(_DEBUG) && (defined _WIN32 || defined _WIN64)
 	_CrtDumpMemoryLeaks();
 #endif
 	return 0;
