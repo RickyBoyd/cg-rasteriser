@@ -47,21 +47,22 @@ const float FOCAL_LENGTH = SCREEN_WIDTH / 2;
 
 void Update(Scene &scene, Uint8 &lightSelected);
 
-void Draw(Scene &scene, const std::vector<Triangle> &triangles);
+void Draw(Scene &scene, const std::vector<Triangle> &triangles, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT]);
 
 void Interpolate(float a, float b, std::vector<float> &result);
 void Interpolate( ivec2 a, ivec2 b, std::vector<ivec2>& result );
+void Interpolate( Pixel a, Pixel b, std::vector<Pixel>& result );
 
 void VertexShader(const vec3& v, Scene &scene, Pixel& p);
 
-void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color );
-void ComputeLine( SDL_Surface* surface, ivec2 a, ivec2 b, std::vector<ivec2> &line );
+//void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color );
+void ComputeLine( Pixel a, Pixel b, std::vector<Pixel> &line );
 
-void DrawPolygonEdges( const std::vector<vec3>& vertices, Scene &scene );
+void DrawPolygonEdges( const std::vector<vec3>& vertices, Scene &scene, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT] );
 
-void DrawPolygonRows( const std::vector<Pixel>& leftPixels, const std::vector<Pixel>& rightPixels, vec3 color );
+void DrawPolygonRows( const std::vector<Pixel>& leftPixels, const std::vector<Pixel>& rightPixels, vec3 color, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT] );
 
-void DrawPolygon( const std::vector<vec3>& vertices, vec3 color, Scene& scene );
+void DrawPolygon( const std::vector<vec3>& vertices, vec3 color, Scene& scene, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT] );
 
 void ComputePolygonRows(const std::vector<Pixel>& vertexPixels, std::vector<Pixel>& leftPixels, std::vector<Pixel>& rightPixels );
 
@@ -119,7 +120,7 @@ int main(int argc, char *argv[]) {
 	std::vector<Triangle> sceneTris = scene.ToTriangles();
 	std::cout << "Loaded " << sceneTris.size() << " tris" << std::endl;
 
-
+	float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT];
 
 	// std::vector<ivec2> vertexPixels(3);
 	// vertexPixels[0] = ivec2(10, 5);
@@ -139,7 +140,7 @@ int main(int argc, char *argv[]) {
 	// }
 
 	while (NoQuitMessageSDL()) {
-		Draw(scene, sceneTris);
+		Draw(scene, sceneTris, depth_buffer);
 		Update(scene, lightSelected);
 	}
 
@@ -147,12 +148,19 @@ int main(int argc, char *argv[]) {
 	return 0;
 }
 
-void Draw(Scene &scene, const std::vector<Triangle> &triangles)
+void Draw(Scene &scene, const std::vector<Triangle> &triangles, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT])
 {
 	SDL_FillRect(screen, 0, 0);
 	if (SDL_MUSTLOCK(screen))
 		SDL_LockSurface(screen);
 
+	for(int x = 0; x < SCREEN_WIDTH; x++)
+	{
+		for(int y = 0; y < SCREEN_HEIGHT; y++)
+		{
+			depth_buffer[x][y] = 0;
+		}
+	}
 	for (auto triangle : triangles)
 	{
 		std::vector<vec3> vertices(3);
@@ -160,14 +168,14 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles)
 		vertices[1] = triangle.v1;
 		vertices[2] = triangle.v2;
 
-		DrawPolygon( vertices, triangle.color, scene );
+		DrawPolygon( vertices, triangle.color, scene, depth_buffer );
 	}
 	if (SDL_MUSTLOCK(screen))
 		SDL_UnlockSurface(screen);
 	SDL_UpdateRect(screen, 0, 0, 0, 0);
 }
 
-void DrawPolygon( const std::vector<vec3>& vertices, vec3 color, Scene& scene )
+void DrawPolygon( const std::vector<vec3>& vertices, vec3 color, Scene& scene, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT] )
 {
 	int V = vertices.size();
 	std::vector<Pixel> vertexPixels( V );
@@ -180,16 +188,25 @@ void DrawPolygon( const std::vector<vec3>& vertices, vec3 color, Scene& scene )
 	std::vector<Pixel> leftPixels;
 	std::vector<Pixel> rightPixels;
 	ComputePolygonRows( vertexPixels, leftPixels, rightPixels );
-	DrawPolygonRows( leftPixels, rightPixels, color );
+	DrawPolygonRows( leftPixels, rightPixels, color, depth_buffer );
 }
 
-void DrawPolygonRows( const std::vector<Pixel>& leftPixels, const std::vector<Pixel>& rightPixels, vec3 color )
+void DrawPolygonRows( const std::vector<Pixel>& leftPixels, const std::vector<Pixel>& rightPixels, vec3 color, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT] )
 {
 	for(int j = 0; j < leftPixels.size(); j++)
 	{
-		for(int x = leftPixels[j].x; x <= rightPixels[j].x; x++)
+		std::vector<Pixel> row;
+		ComputeLine(leftPixels[j], rightPixels[j], row);
+		for(Pixel pixel : row)
 		{
-			PutPixelSDL(screen, x, leftPixels[j].y, color);
+			if(pixel.x >= 0 && pixel.x <= SCREEN_WIDTH && pixel.y >= 0 && pixel.y< SCREEN_HEIGHT)
+			{
+				if(pixel.z_inv > depth_buffer[pixel.x][pixel.y])
+				{
+					depth_buffer[pixel.x][pixel.y] = pixel.z_inv;
+					PutPixelSDL(screen, pixel.x, pixel.y, color);
+				}
+			}
 		}
 	}
 }
@@ -229,10 +246,8 @@ void ComputePolygonRows(const std::vector<Pixel>& vertexPixels, std::vector<Pixe
 	for( int i=0; i<vertexPixels.size(); ++i )
 	{
 		int j = (i+1)%vertexPixels.size(); // The next vertex
-		std::vector<ivec2> line;
-		ivec2 v_i( vertexPixels[i].x, vertexPixels[i].y);
-		ivec2 v_j(  vertexPixels[j].x,  vertexPixels[j].y);
-		ComputeLine( screen, v_i, v_j, line );
+		std::vector<Pixel> line;
+		ComputeLine( vertexPixels[i], vertexPixels[j], line );
 		for(auto linePixel : line)
 		{
 			int y = linePixel.y - miny;
@@ -250,8 +265,16 @@ void ComputePolygonRows(const std::vector<Pixel>& vertexPixels, std::vector<Pixe
 			} 
 			else
 			{
-				leftPixels[y].x  = std::min(leftPixels[y].x,  linePixel.x);
-				rightPixels[y].x = std::max(rightPixels[y].x, linePixel.x);
+				if(leftPixels[y].x > linePixel.x)
+				{
+					leftPixels[y].z_inv = linePixel.z_inv;
+					leftPixels[y].x  = linePixel.x;
+				}
+				if(rightPixels[y].x < linePixel.x)
+				{
+					rightPixels[y].z_inv = linePixel.z_inv;
+					rightPixels[y].x = linePixel.x;
+				}
 			}
 		}
 	}
@@ -288,22 +311,37 @@ void VertexShader(const vec3& world_vertex, Scene &scene, Pixel& p)
 	p.z_inv = camera_vertex.z == 0.0f ? std::numeric_limits<float>::max() : 1.0f/camera_vertex.z;
 }
 
-void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color )
-{	
-	std::vector<ivec2> line;
-	ComputeLine(screen, a, b, line);
-	for(auto pixel : line)
-	{
-		PutPixelSDL(screen, pixel.x, pixel.y, color);
-	}
-}
+// void DrawLineSDL( SDL_Surface* surface, ivec2 a, ivec2 b, vec3 color )
+// {	
+// 	std::vector<ivec2> line;
+// 	ComputeLine(screen, a, b, line);
+// 	for(auto pixel : line)
+// 	{
+// 		PutPixelSDL(screen, pixel.x, pixel.y, color);
+// 	}
+// }
 
-void ComputeLine( SDL_Surface* surface, ivec2 a, ivec2 b, std::vector<ivec2> &line )
+void ComputeLine( Pixel a, Pixel b, std::vector<Pixel> &line )
 {
-	ivec2 delta = glm::abs( a - b );
-	int pixels = glm::max( delta.x, delta.y ) + 1;
+	int delta_x = glm::abs(a.x - b.x);
+	int delta_y = glm::abs(a.y - b.y);
+	int pixels = glm::max( delta_x, delta_y ) + 1;
 	line.resize(pixels);
 	Interpolate( a, b, line );
+}
+
+void Interpolate( Pixel a, Pixel b, std::vector<Pixel>& result )
+{
+	int N = result.size();
+	glm::vec3 a_vec(a.x, a.y, a.z_inv);
+	glm::vec3 b_vec(b.x, b.y, b.z_inv);
+	glm::vec3 step = glm::vec3(b_vec-a_vec) / static_cast<float>( std::max(N-1, 1) );
+	glm::vec3 current( a_vec );
+	for( int i=0; i<N; ++i )
+	{
+		result[i] = {current.x, current.y, current.z};
+		current += step;
+	}
 }
 
 
