@@ -2,6 +2,7 @@
 #include <regex>
 #include <fstream>
 #include <memory>
+#include <boost/algorithm/string.hpp>
 
 Material::Material() {}
 
@@ -24,7 +25,8 @@ std::vector<std::shared_ptr<Material>> Material::LoadMaterials(std::string filen
 
 	for (std::string str; std::getline(is, str);)
 	{
-		std::vector<std::string> tokens = SplitString(str, "\\s+");
+		std::vector<std::string> tokens;
+		boost::split(tokens, str, boost::is_any_of("\t "));
 		std::remove_if(tokens.begin(), tokens.end(), [](std::string t) -> bool { return t.compare("") == 0; });
 
 		if (tokens[0].compare("newmtl") == 0)
@@ -79,12 +81,4 @@ std::vector<std::shared_ptr<Material>> Material::LoadMaterials(std::string filen
 	}
 
 	return materials;
-}
-
-std::vector<std::string> Material::SplitString(const std::string& str, const std::string& regex)
-{
-	std::regex re(regex);
-	std::sregex_token_iterator first(str.begin(), str.end(), re, -1);
-	std::sregex_token_iterator last;
-	return std::vector<std::string>(first, last);
 }

@@ -26,6 +26,12 @@ extern "C" {
 }
 #endif
 
+/*#ifdef _DEBUG
+#define _CRTDBG_MAP_ALLOC
+#include <stdlib.h>
+#include <crtdbg.h>	
+#endif*/
+
 struct Pixel
 {
 	int x;
@@ -122,21 +128,21 @@ int main(int argc, char *argv[]) {
 
 	float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT];
 
-	// std::vector<ivec2> vertexPixels(3);
-	// vertexPixels[0] = ivec2(10, 5);
-	// vertexPixels[1] = ivec2( 5,10);
-	// vertexPixels[2] = ivec2(15,15);
-	// std::vector<ivec2> leftPixels;
-	// std::vector<ivec2> rightPixels;
-	// ComputePolygonRows( vertexPixels, leftPixels, rightPixels );
-	// for( int row=0; row<leftPixels.size(); ++row )
+	// std::vector<ivec2> vertex_pixels(3);
+	// vertex_pixels[0] = ivec2(10, 5);
+	// vertex_pixels[1] = ivec2( 5,10);
+	// vertex_pixels[2] = ivec2(15,15);
+	// std::vector<ivec2> left_pixels;
+	// std::vector<ivec2> right_pixels;
+	// ComputePolygonRows( vertex_pixels, left_pixels, right_pixels );
+	// for( int row=0; row<left_pixels.size(); ++row )
 	// {
 	// 	std::cout << "Start: ("
-	// 	<< leftPixels[row].x << ","
-	// 	<< leftPixels[row].y << "). "
+	// 	<< left_pixels[row].x << ","
+	// 	<< left_pixels[row].y << "). "
 	// 	<< "End: ("
-	// 	<< rightPixels[row].x << ","
-	// 	<< rightPixels[row].y << "). " << std::endl;
+	// 	<< right_pixels[row].x << ","
+	// 	<< right_pixels[row].y << "). " << std::endl;
 	// }
 
 	while (NoQuitMessageSDL()) {
@@ -145,6 +151,9 @@ int main(int argc, char *argv[]) {
 	}
 
 	SDL_SaveBMP(screen, "screenshot.bmp");
+#ifdef _DEBUG
+	_CrtDumpMemoryLeaks();
+#endif
 	return 0;
 }
 
@@ -211,69 +220,58 @@ void DrawPolygonRows( const std::vector<Pixel>& leftPixels, const std::vector<Pi
 	}
 }
 
-void ComputePolygonRows(const std::vector<Pixel>& vertexPixels, std::vector<Pixel>& leftPixels, std::vector<Pixel>& rightPixels )
+void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pixel>& left_pixels, std::vector<Pixel>& right_pixels)
 {
-// 1. Find max and min y-value of the polygon
-// and compute the number of rows it occupies.
-// 2. Resize leftPixels and rightPixels
-// so that they have an element for each row.
-// 3. Initialize the x-coordinates in leftPixels
-// to some really large value and the x-coordinates
-// in rightPixels to some really small value.
-	
-	int miny = std::numeric_limits<int>::max();
-	int maxy = std::numeric_limits<int>::min();
-	for(auto vertex : vertexPixels)
+	// Find max and min y-value of the polygon and compute the number of rows it occupies.
+
+	int min_y = std::numeric_limits<int>::max();
+	int max_y = std::numeric_limits<int>::min();
+
+	for (auto vertex : vertex_pixels)
 	{
-		miny = std::min(vertex.y, miny);
-		maxy = std::max(vertex.y, maxy);
+		min_y = std::min(vertex.y, min_y);
+		max_y = std::max(vertex.y, max_y);
 	}
-	int size = maxy - miny + 1;
-	//initialise rows
-	leftPixels.resize(size);
-	rightPixels.resize(size);
-	for( int i=0; i<size; ++i )
+	int rows = max_y - min_y + 1;
+
+	// Resize left_pixels and right_pixels so that they have an element for each row.
+	left_pixels.resize(rows);
+	right_pixels.resize(rows);
+
+	// 3. Initialize the x-coordinates in left_pixels to some really large value and the x-coordinates in right_pixels to some really small value.
+	for (int row = 0; row < rows; ++row)
 	{
-		leftPixels[i].x =  std::numeric_limits<int>::max();
-		rightPixels[i].x = std::numeric_limits<int>::min();
-		leftPixels[i].y  = miny + i; 
-		rightPixels[i].y = miny + i;
+		left_pixels[row].x = std::numeric_limits<int>::max();
+		right_pixels[row].x = std::numeric_limits<int>::min();
+		left_pixels[row].y = min_y + row;
+		right_pixels[row].y = min_y + row;
 	}
-// 4. Loop through all edges of the polygon and use
-// linear interpolation to find the x-coordinate for
-// each row it occupies. Update the corresponding
-// values in rightPixels and leftPixels.
-	for( int i=0; i<vertexPixels.size(); ++i )
+
+	// 4. Loop through all edges of the polygon and use linear interpolation to find the x-coordinate for
+	// each row it occupies. Update the corresponding values in right_pixels and left_pixels.
+	for (int i = 0; i < vertex_pixels.size(); ++i)
 	{
-		int j = (i+1)%vertexPixels.size(); // The next vertex
+		int j = (i + 1) % vertex_pixels.size(); // the next vertex
 		std::vector<Pixel> line;
-		ComputeLine( vertexPixels[i], vertexPixels[j], line );
-		for(auto linePixel : line)
+		ComputeLine(vertex_pixels[i], vertex_pixels[j], line);
+		for (auto line_pixel : line)
 		{
-			int y = linePixel.y - miny;
-			if(y >= leftPixels.size())
+			int row = line_pixel.y - min_y;
+			if (row >= rows)
 			{
-				std::cout << "y is greater that right left.size() \n";
-				std::cout << "y: " << y << std::endl;
-				std::cout << "size: " << leftPixels.size() << std::endl;
-				if(y >= rightPixels.size())
-				{
-					std::cout << "y is greater that right pixels.size() \n";
-					std::cout << "y: " << y << std::endl;
-					std::cout << "size: " << rightPixels.size() << std::endl;
-				}
-			} 
+				std::cout << "row (" << row << ") is greater than number of rows (" << rows << ")" << std::endl;
+			}
 			else
 			{
-				if(leftPixels[y].x > linePixel.x)
+				if (line_pixel.x < left_pixels[row].x)
 				{
-					leftPixels[y].z_inv = linePixel.z_inv;
-					leftPixels[y].x  = linePixel.x;
+					left_pixels[row].z_inv = line_pixel.z_inv;
+					left_pixels[row].x = line_pixel.x;
 				}
-				if(rightPixels[y].x < linePixel.x)
+				if (line_pixel.x > right_pixels[row].x)
 				{
-					rightPixels[y].z_inv = linePixel.z_inv;
-					rightPixels[y].x = linePixel.x;
+					right_pixels[row].z_inv = line_pixel.z_inv;
+					right_pixels[row].x = line_pixel.x;
 				}
 			}
 		}
@@ -321,55 +319,58 @@ void VertexShader(const vec3& world_vertex, Scene &scene, Pixel& p)
 // 	}
 // }
 
-void ComputeLine( Pixel a, Pixel b, std::vector<Pixel> &line )
+void ComputeLine(Pixel a, Pixel b, std::vector<Pixel> &line)
 {
 	int delta_x = glm::abs(a.x - b.x);
 	int delta_y = glm::abs(a.y - b.y);
-	int pixels = glm::max( delta_x, delta_y ) + 1;
+	int pixels = glm::max(delta_x, delta_y) + 1; // TODO: why +1?
 	line.resize(pixels);
-	Interpolate( a, b, line );
+	Interpolate(a, b, line);
 }
 
-void Interpolate( Pixel a, Pixel b, std::vector<Pixel>& result )
+void Interpolate(Pixel a, Pixel b, std::vector<Pixel>& result)
 {
 	int N = result.size();
 	glm::vec3 a_vec(a.x, a.y, a.z_inv);
 	glm::vec3 b_vec(b.x, b.y, b.z_inv);
-	glm::vec3 step = glm::vec3(b_vec-a_vec) / static_cast<float>( std::max(N-1, 1) );
-	glm::vec3 current( a_vec );
-	for( int i=0; i<N; ++i )
+	glm::vec3 step = glm::vec3(b_vec - a_vec) / float(std::max(N - 1, 1));
+	glm::vec3 current(a_vec);
+	for (int i = 0; i < N; ++i)
 	{
-		result[i] = {int(current.x), int(current.y), current.z};
+		result[i] = { int(round(current.x)), int(round(current.y)), current.z };
 		current += step;
 	}
 }
 
-
-void Interpolate( ivec2 a, ivec2 b, std::vector<ivec2>& result )
+void Interpolate(ivec2 a, ivec2 b, std::vector<ivec2>& result)
 {
 	int N = result.size();
-	glm::vec2 step = glm::vec2(b-a) / static_cast<float>( std::max(N-1, 1) );
-	glm::vec2 current( a );
-	for( int i=0; i<N; ++i )
+	glm::vec2 step = glm::vec2(b - a) / float(std::max(N - 1, 1));
+	glm::vec2 current(a);
+	for (int i = 0; i < N; ++i)
 	{
 		result[i] = current;
 		current += step;
 	}
 }
 
-void Interpolate(float a, float b, std::vector<float> &result) {
-	if (result.size() == 0) return;
-	if (result.size() == 1) {
-		result[0] = (a + b) / 2;
-		return;
-	}
-	else {
-		float diff = b - a;
-		float step = diff / (result.size() - 1);
-		result[0] = a;
-		for (int i = 1; i < result.size(); i++) {
-			result[i] = result[i - 1] + step;
-		}
+void Interpolate(float a, float b, std::vector<float> &result)
+{
+	switch (result.size())
+	{
+		case 0:
+			break;
+		case 1:
+			result[0] = (a + b) / 2.0f;
+			break;
+		default:
+			float step = (b - a) / float(result.size() - 1);
+			float current = a;
+			for (int i = 0; i < result.size(); i++) {
+				result[i] = current;
+				current += step;
+			}
+			break;
 	}
 }
 
