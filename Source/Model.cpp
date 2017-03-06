@@ -1,5 +1,7 @@
 ﻿#include "Model.h"
 #include <experimental/filesystem>
+#include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/trim_all.hpp>
 
 Model::Model(std::vector<std::shared_ptr<Face>> faces) : faces_(faces) {}
 
@@ -14,7 +16,9 @@ Model::Model(std::string filename)
 
 	for (std::string str; std::getline(is, str);)
 	{
-		std::vector<std::string> tokens = SplitString(str, "\\s+");
+		std::vector<std::string> tokens;
+		boost::trim_all(str);
+		boost::split(tokens, str, boost::is_any_of("\t "));
 
 		if (tokens[0].compare("v") == 0)
 		{
@@ -23,9 +27,10 @@ Model::Model(std::string filename)
 		}
 		else if (tokens[0].compare("f") == 0)
 		{
-			std::vector<std::string> vertex1 = SplitString(tokens[1], "/");
-			std::vector<std::string> vertex2 = SplitString(tokens[2], "/");
-			std::vector<std::string> vertex3 = SplitString(tokens[3], "/");
+			std::vector<std::string> vertex1, vertex2, vertex3;
+			boost::split(vertex1, tokens[1], boost::is_any_of("/"));
+			boost::split(vertex2, tokens[2], boost::is_any_of("/"));
+			boost::split(vertex3, tokens[3], boost::is_any_of("/"));
 
 			std::vector<glm::vec3> vertices{};
 			auto texture_coords = std::vector<glm::vec2>{};
@@ -97,14 +102,6 @@ Model::Model(std::string filename)
 			material = *(matching->get());
 		}
 	}
-}
-
-std::vector<std::string> Model::SplitString(const std::string& str, const std::string& regex)
-{
-	std::regex re(regex);
-	std::sregex_token_iterator first( str.begin(), str.end(), re, -1 );
-	std::sregex_token_iterator last;
-	return std::vector<std::string>(first, last);
 }
 
 std::vector<Triangle> Model::ToTriangles(const glm::vec3 transform, const glm::vec3 scale) const

@@ -3,6 +3,7 @@
 #include <fstream>
 #include <memory>
 #include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/trim_all.hpp>
 
 Material::Material() {}
 
@@ -26,6 +27,7 @@ std::vector<std::shared_ptr<Material>> Material::LoadMaterials(std::string filen
 	for (std::string str; std::getline(is, str);)
 	{
 		std::vector<std::string> tokens;
+		boost::trim_all(str);
 		boost::split(tokens, str, boost::is_any_of("\t "));
 		std::remove_if(tokens.begin(), tokens.end(), [](std::string t) -> bool { return t.compare("") == 0; });
 
