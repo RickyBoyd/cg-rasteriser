@@ -46,13 +46,13 @@ int t;
 const float FOCAL_LENGTH = SCREEN_WIDTH / 2;
 
 void Update(Scene &scene, Uint8 &light_selected);
-void Draw(Scene &scene, const std::vector<Triangle> &triangles, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT]);
+void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer);
 
 void VertexShader(const vec3& v, Scene &scene, Pixel& p);
 void ComputeLine(Pixel a, Pixel b, std::vector<Pixel> &line);
 void DrawPolygonEdges(const std::vector<vec3>& vertices, Scene &scene);
-void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, vec3 color, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT]);
-void DrawPolygon(const std::vector<vec3>& vertices, vec3 color, Scene& scene, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT]);
+void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, vec3 color, std::vector<float>& depth_buffer);
+void DrawPolygon(const std::vector<vec3>& vertices, vec3 color, Scene& scene, std::vector<float>& depth_buffer);
 void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pixel>& left_pixels, std::vector<Pixel>& right_pixels);
 
 int main(int argc, char *argv[]) {
@@ -109,7 +109,8 @@ int main(int argc, char *argv[]) {
 	std::vector<Triangle> scene_tris = scene.ToTriangles();
 	std::cout << "Loaded " << scene_tris.size() << " tris" << std::endl;
 
-	float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT];
+	std::vector<float> depth_buffer;
+	depth_buffer.resize(SCREEN_WIDTH * SCREEN_HEIGHT);
 
 	while (NoQuitMessageSDL()) {
 		Draw(scene, scene_tris, depth_buffer);
@@ -124,19 +125,20 @@ int main(int argc, char *argv[]) {
 	return 0;
 }
 
-void Draw(Scene &scene, const std::vector<Triangle> &triangles, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT])
+void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer)
 {
 	SDL_FillRect(screen, 0, 0);
 	if (SDL_MUSTLOCK(screen))
 		SDL_LockSurface(screen);
 
-	for(int x = 0; x < SCREEN_WIDTH; x++)
+	for(int y = 0; y < SCREEN_HEIGHT; y++)
 	{
-		for(int y = 0; y < SCREEN_HEIGHT; y++)
+		for(int x = 0; x < SCREEN_WIDTH; x++)
 		{
-			depth_buffer[x][y] = 0;
+			depth_buffer[y * SCREEN_WIDTH + x] = 0;
 		}
 	}
+
 	for (auto triangle : triangles)
 	{
 		std::vector<vec3> vertices(3);
@@ -144,7 +146,7 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles, float depth_buff
 		vertices[1] = triangle.v1;
 		vertices[2] = triangle.v2;
 
-		DrawPolygon( vertices, triangle.color, scene, depth_buffer );
+		DrawPolygon(vertices, triangle.color, scene, depth_buffer);
 		//DrawPolygonEdges(vertices, scene);
 	}
 	if (SDL_MUSTLOCK(screen))
@@ -152,7 +154,7 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles, float depth_buff
 	SDL_UpdateRect(screen, 0, 0, 0, 0);
 }
 
-void DrawPolygon(const std::vector<vec3>& vertices, vec3 color, Scene& scene, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT])
+void DrawPolygon(const std::vector<vec3>& vertices, vec3 color, Scene& scene, std::vector<float>& depth_buffer)
 {
 	int num_vertices = vertices.size();
 	std::vector<Pixel> vertex_pixels(num_vertices);
@@ -167,7 +169,7 @@ void DrawPolygon(const std::vector<vec3>& vertices, vec3 color, Scene& scene, fl
 	DrawPolygonRows(left_pixels, right_pixels, color, depth_buffer);
 }
 
-void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, vec3 color, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT])
+void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, vec3 color, std::vector<float>& depth_buffer)
 {
 	for (int i = 0; i < left_pixels.size(); i++)
 	{
@@ -177,9 +179,9 @@ void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pi
 		{
 			if (pixel.pos.x >= 0 && pixel.pos.x < SCREEN_WIDTH && pixel.pos.y >= 0 && pixel.pos.y < SCREEN_HEIGHT)
 			{
-				if (pixel.z_inv > depth_buffer[pixel.pos.x][pixel.pos.y])
+				if (pixel.z_inv > depth_buffer[pixel.pos.y * SCREEN_WIDTH + pixel.pos.x])
 				{
-					depth_buffer[pixel.pos.x][pixel.pos.y] = pixel.z_inv;
+					depth_buffer[pixel.pos.y * SCREEN_WIDTH + pixel.pos.x] = pixel.z_inv;
 					PutPixelSDL(screen, pixel.pos.x, pixel.pos.y, color);
 				}
 			}
