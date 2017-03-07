@@ -155,33 +155,32 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles, float depth_buff
 	SDL_UpdateRect(screen, 0, 0, 0, 0);
 }
 
-void DrawPolygon( const std::vector<vec3>& vertices, vec3 color, Scene& scene, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT] )
+void DrawPolygon(const std::vector<vec3>& vertices, vec3 color, Scene& scene, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT])
 {
-	int V = vertices.size();
-	std::vector<Pixel> vertexPixels( V );
-	for( int i=0; i<V; ++i )
+	int num_vertices = vertices.size();
+	std::vector<Pixel> vertex_pixels(num_vertices);
+	for (int i = 0; i < num_vertices; ++i)
 	{
-
-		VertexShader( vertices[i], scene, vertexPixels[i]);
+		VertexShader(vertices[i], scene, vertex_pixels[i]);
 	}
 
-	std::vector<Pixel> leftPixels;
-	std::vector<Pixel> rightPixels;
-	ComputePolygonRows( vertexPixels, leftPixels, rightPixels );
-	DrawPolygonRows( leftPixels, rightPixels, color, depth_buffer );
+	std::vector<Pixel> left_pixels;
+	std::vector<Pixel> right_pixels;
+	ComputePolygonRows(vertex_pixels, left_pixels, right_pixels);
+	DrawPolygonRows(left_pixels, right_pixels, color, depth_buffer);
 }
 
-void DrawPolygonRows( const std::vector<Pixel>& leftPixels, const std::vector<Pixel>& rightPixels, vec3 color, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT] )
+void DrawPolygonRows(const std::vector<Pixel>& leftPixels, const std::vector<Pixel>& rightPixels, vec3 color, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT])
 {
-	for(int j = 0; j < leftPixels.size(); j++)
+	for (int i = 0; i < leftPixels.size(); i++)
 	{
 		std::vector<Pixel> row;
-		ComputeLine(leftPixels[j], rightPixels[j], row);
-		for(Pixel pixel : row)
+		ComputeLine(leftPixels[i], rightPixels[i], row);
+		for (auto pixel : row)
 		{
-			if(pixel.pos.x >= 0 && pixel.pos.x < SCREEN_WIDTH && pixel.pos.y >= 0 && pixel.pos.y < SCREEN_HEIGHT)
+			if (pixel.pos.x >= 0 && pixel.pos.x < SCREEN_WIDTH && pixel.pos.y >= 0 && pixel.pos.y < SCREEN_HEIGHT)
 			{
-				if(pixel.z_inv > depth_buffer[pixel.pos.x][pixel.pos.y])
+				if (pixel.z_inv > depth_buffer[pixel.pos.x][pixel.pos.y])
 				{
 					depth_buffer[pixel.pos.x][pixel.pos.y] = pixel.z_inv;
 					PutPixelSDL(screen, pixel.pos.x, pixel.pos.y, color);
