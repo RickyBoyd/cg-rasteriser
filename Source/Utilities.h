@@ -12,8 +12,8 @@ struct Pixel
 {
 	glm::ivec2 pos; // 2d position on screen
 	float z_inv;
-	glm::vec3 world_pos; // 3d position in world coordinate system
-	glm::vec3 normal; // normal in world coordinate system
+	glm::vec3 camera_pos; // 3d position in camera coordinate system
+	glm::vec3 camera_normal; // normal in camera coordinate system
 	glm::vec3 diffuse_reflectance;
 	glm::vec3 indirect_reflectance;
 };
