@@ -179,7 +179,7 @@ void DrawPolygonRows( const std::vector<Pixel>& leftPixels, const std::vector<Pi
 		ComputeLine(leftPixels[j], rightPixels[j], row);
 		for(Pixel pixel : row)
 		{
-			if(pixel.pos.x >= 0 && pixel.pos.x <= SCREEN_WIDTH && pixel.pos.y >= 0 && pixel.pos.y < SCREEN_HEIGHT)
+			if(pixel.pos.x >= 0 && pixel.pos.x < SCREEN_WIDTH && pixel.pos.y >= 0 && pixel.pos.y < SCREEN_HEIGHT)
 			{
 				if(pixel.z_inv > depth_buffer[pixel.pos.x][pixel.pos.y])
 				{
