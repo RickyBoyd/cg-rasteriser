@@ -194,8 +194,8 @@ void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pix
 
 	for (auto vertex : vertex_pixels)
 	{
-		min_y = std::min(vertex.ipos().y, min_y);
-		max_y = std::max(vertex.ipos().y, max_y);
+		min_y = std::min(vertex.pos.y, min_y);
+		max_y = std::max(vertex.pos.y, max_y);
 	}
 	int rows = max_y - min_y + 1;
 
@@ -221,7 +221,7 @@ void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pix
 		ComputeLine(vertex_pixels[i], vertex_pixels[j], line);
 		for (auto line_pixel : line)
 		{
-			int row = line_pixel.ipos().y - min_y;
+			int row = line_pixel.pos.y - min_y;
 			if (row >= rows)
 			{
 				std::cout << "row (" << row << ") is greater than number of rows (" << rows << ")" << std::endl;
@@ -279,10 +279,10 @@ void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pi
 
 void DrawPixel(const Pixel& pixel, std::vector<float>& depth_buffer)
 {
-	if (pixel.z_inv > depth_buffer[pixel.ipos().y * SCREEN_WIDTH + pixel.ipos().x])
+	if (pixel.z_inv > depth_buffer[pixel.pos.y * SCREEN_WIDTH + pixel.pos.x])
 	{
-		depth_buffer[pixel.ipos().y * SCREEN_WIDTH + pixel.ipos().x] = pixel.z_inv;
-		PutPixelSDL(screen, pixel.ipos().x, pixel.ipos().y, pixel.illumination);
+		depth_buffer[pixel.pos.y * SCREEN_WIDTH + pixel.pos.x] = pixel.z_inv;
+		PutPixelSDL(screen, pixel.pos.x, pixel.pos.y, pixel.illumination);
 	}
 }
 

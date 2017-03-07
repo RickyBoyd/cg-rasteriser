@@ -3,45 +3,23 @@
 #include <algorithm>
 #include <glm/detail/func_common.hpp>
 
-Pixel Pixel::operator + (const Pixel p) const {
-	return Pixel{
-		pos + p.pos,
-		z_inv + p.z_inv,
-		illumination + p.illumination
-	};
-}
-
-Pixel Pixel::operator - (const Pixel p) const {
-	return Pixel{
-		pos - p.pos,
-		z_inv - p.z_inv,
-		illumination - p.illumination
-	};
-}
-
-Pixel Pixel::operator / (const float divisor) const {
-	return Pixel{
-		glm::vec2(pos) / divisor,
-		z_inv / divisor,
-		illumination / divisor
-	};
-}
-
-glm::ivec2 Pixel::ipos() const
-{
-	return glm::round(pos);
-}
 
 void Interpolate(const Pixel a, const Pixel b, std::vector<Pixel>& result)
 {
 	int N = result.size();
-	auto step = (b - a) / float(std::max(N - 1, 1));
+	auto step_pos = glm::vec2(b.pos - a.pos) / float(std::max(N - 1, 1));
+	auto step_z_inv = (b.z_inv - a.z_inv) / float(std::max(N - 1, 1));
+	auto step_illumination = (b.illumination - a.illumination) / float(std::max(N - 1, 1));
 
-	auto current = a;
+	auto current_pos = glm::vec2(a.pos);
+	auto current_z_inv = a.z_inv;
+	auto current_illumination = a.illumination;
 	for (int i = 0; i < N; ++i)
 	{
-		result[i] = current;
-		current = current + step;
+		result[i] = Pixel { glm::round(current_pos), current_z_inv, current_illumination };
+		current_pos += step_pos;
+		current_z_inv += step_z_inv;
+		current_illumination += step_illumination;
 	}
 }
 
