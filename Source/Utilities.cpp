@@ -10,15 +10,15 @@ void Interpolate(const Pixel a, const Pixel b, std::vector<Pixel>& result)
 	float divisor_step = float(std::max(N - 1, 1));
 	auto step_pos = glm::vec2(b.pos - a.pos) / divisor_step;
 	auto step_z_inv = (b.z_inv - a.z_inv) / divisor_step;
-	auto step_camera_pos = (b.camera_pos - a.camera_pos) / divisor_step;
-	auto step_normal = (b.camera_normal - a.camera_normal) / divisor_step; // Not strictly necessary if we're interpolating triangles
+	auto step_camera_pos = (b.world_pos - a.world_pos) / divisor_step;
+	auto step_normal = (b.normal - a.normal) / divisor_step; // Not strictly necessary if we're interpolating triangles
 	auto step_diffuse_reflectance = (b.diffuse_reflectance - a.diffuse_reflectance) / divisor_step;
 	auto step_indirect_reflectance = (b.indirect_reflectance - a.indirect_reflectance) / divisor_step;
 
 	auto current_pos = glm::vec2(a.pos);
 	auto current_z_inv = a.z_inv;
-	auto current_camera_pos = a.camera_pos;
-	auto current_normal = a.camera_normal;
+	auto current_camera_pos = a.world_pos;
+	auto current_normal = a.normal;
 	auto current_diffuse_reflectance = a.diffuse_reflectance;
 	auto current_indirect_reflectance = a.indirect_reflectance;
 	for (int i = 0; i < N; ++i)

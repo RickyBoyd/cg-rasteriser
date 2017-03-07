@@ -43,7 +43,7 @@ int t;
 const float FOCAL_LENGTH = SCREEN_WIDTH / 2;
 
 void Update(Scene &scene, Uint8 &light_selected);
-void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer);
+void Draw(const Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer);
 
 void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line);
 void DrawTriangle(const Triangle& triangle, const Scene& scene, std::vector<float>& depth_buffer);
@@ -129,7 +129,7 @@ int main(int argc, char *argv[]) {
 	return 0;
 }
 
-void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer)
+void Draw(const Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer)
 {
 	SDL_FillRect(screen, 0, 0);
 	if (SDL_MUSTLOCK(screen))
@@ -141,11 +141,6 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<floa
 		{
 			depth_buffer[y * SCREEN_WIDTH + x] = 0;
 		}
-	}
-
-	for (auto &light : scene.lights_)
-	{
-		light.UpdateCameraSpacePosition(scene.camera_);
 	}
 
 	for (auto triangle : triangles)
@@ -276,9 +271,9 @@ void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth
 		{
 			// Compute the camera-space vector between the 3d position of the pixel and the light source
 			// TODO: cache this while camera and light static
-			vec3 camera_pixel_to_light = light.camera_position - pixel.camera_pos;
+			vec3 pixel_to_light = light.position - pixel.world_pos;
 
-			vec3 direct_light = light.color * std::max(abs(glm::dot(glm::normalize(camera_pixel_to_light), glm::normalize(pixel.camera_normal))), 0.0f) / float(4.0f * M_PI * glm::dot(camera_pixel_to_light, camera_pixel_to_light));
+			vec3 direct_light = light.color * std::max(abs(glm::dot(glm::normalize(pixel_to_light), glm::normalize(pixel.normal))), 0.0f) / float(4.0f * M_PI * glm::dot(pixel_to_light, pixel_to_light));
 			illumination += direct_light * pixel.diffuse_reflectance + scene.indirect_light_ * pixel.indirect_reflectance;
 		}
 
@@ -288,11 +283,6 @@ void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth
 
 Pixel VertexToPixel(const glm::vec3 world_vertex, const Triangle& triangle, const Scene &scene)
 {
-	vec3 camera_vertex_normal = triangle.normal;
-	camera_vertex_normal = glm::rotate(camera_vertex_normal, glm::radians(scene.camera_.pitch), vec3(1.0f, 0.0f, 0.0f));
-	camera_vertex_normal = glm::rotate(camera_vertex_normal, glm::radians(scene.camera_.yaw), vec3(0.0f, 1.0f, 0.0f));
-	camera_vertex_normal = glm::rotate(camera_vertex_normal, glm::radians(scene.camera_.roll), vec3(0.0f, 0.0f, 1.0f));
-
 	// Convert the world-space vertex into a camera-space vertex
 	// TODO: cache all these computations
 	vec3 camera_vertex_position = world_vertex - scene.camera_.position;
@@ -305,8 +295,8 @@ Pixel VertexToPixel(const glm::vec3 world_vertex, const Triangle& triangle, cons
 			SCREEN_WIDTH * (scene.camera_.focal_length * camera_vertex_position.x / camera_vertex_position.z + 1.0f / 2.0f),
 			SCREEN_HEIGHT * (-scene.camera_.focal_length * camera_vertex_position.y / camera_vertex_position.z + 1.0f / 2.0f)),
 		camera_vertex_position.z == 0.0f ? std::numeric_limits<float>::max() : 1.0f / camera_vertex_position.z,
-		camera_vertex_position,
-		camera_vertex_normal,
+		world_vertex,
+		triangle.normal,
 		triangle.color,
 		triangle.color
 	};
