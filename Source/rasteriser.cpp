@@ -46,13 +46,13 @@ int t;
 const float FOCAL_LENGTH = SCREEN_WIDTH / 2;
 
 void Update(Scene &scene, Uint8 &light_selected);
-void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer);
+void Draw(const Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer);
 
-void VertexShader(const Vertex& v, Scene &scene, Pixel& p);
-void ComputeLine(Pixel a, Pixel b, std::vector<Pixel> &line);
-void DrawPolygonEdges(const std::vector<Vertex>& vertices, Scene &scene);
-void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, vec3 color, std::vector<float>& depth_buffer);
-void DrawPolygon(const std::vector<Vertex>& vertices, vec3 color, Scene& scene, std::vector<float>& depth_buffer);
+void ShadeVertex(const Vertex& v, const Scene &scene, Pixel& p);
+void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line);
+void DrawPolygonEdges(const std::vector<Vertex>& vertices, const Scene &scene);
+void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const vec3 color, std::vector<float>& depth_buffer);
+void DrawPolygon(const std::vector<Vertex>& vertices, const vec3 color, const Scene& scene, std::vector<float>& depth_buffer);
 void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pixel>& left_pixels, std::vector<Pixel>& right_pixels);
 
 int main(int argc, char *argv[]) {
@@ -125,7 +125,7 @@ int main(int argc, char *argv[]) {
 	return 0;
 }
 
-void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer)
+void Draw(const Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer)
 {
 	SDL_FillRect(screen, 0, 0);
 	if (SDL_MUSTLOCK(screen))
@@ -154,13 +154,13 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<floa
 	SDL_UpdateRect(screen, 0, 0, 0, 0);
 }
 
-void DrawPolygon(const std::vector<Vertex>& vertices, vec3 color, Scene& scene, std::vector<float>& depth_buffer)
+void DrawPolygon(const std::vector<Vertex>& vertices, const vec3 color, const Scene& scene, std::vector<float>& depth_buffer)
 {
 	int num_vertices = vertices.size();
 	std::vector<Pixel> vertex_pixels(num_vertices);
 	for (int i = 0; i < num_vertices; ++i)
 	{
-		VertexShader(vertices[i], scene, vertex_pixels[i]);
+		ShadeVertex(vertices[i], scene, vertex_pixels[i]);
 	}
 
 	std::vector<Pixel> left_pixels;
@@ -169,7 +169,7 @@ void DrawPolygon(const std::vector<Vertex>& vertices, vec3 color, Scene& scene, 
 	DrawPolygonRows(left_pixels, right_pixels, color, depth_buffer);
 }
 
-void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, vec3 color, std::vector<float>& depth_buffer)
+void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const vec3 color, std::vector<float>& depth_buffer)
 {
 	for (int i = 0; i < left_pixels.size(); i++)
 	{
@@ -247,14 +247,14 @@ void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pix
 	}
 }
 
-void DrawPolygonEdges(const std::vector<Vertex>& vertices, Scene &scene)
+void DrawPolygonEdges(const std::vector<Vertex>& vertices, const Scene &scene)
 {
 	// Transform each vertex from 3D world position to 2D image position:
 	std::vector<Pixel> pixels(vertices.size());
 	std::transform(vertices.begin(), vertices.end(), pixels.begin(), [&scene](Vertex vertex) -> Pixel
 	{
 		Pixel p;
-		VertexShader(vertex, scene, p);
+		ShadeVertex(vertex, scene, p);
 		return p;
 	});
 	// Loop over all vertices and draw the edge from it to the next vertex:
@@ -267,7 +267,7 @@ void DrawPolygonEdges(const std::vector<Vertex>& vertices, Scene &scene)
 	}
 }
 
-void VertexShader(const Vertex& world_vertex, Scene &scene, Pixel& p)
+void ShadeVertex(const Vertex& world_vertex, const Scene &scene, Pixel& p)
 {
 	// Convert the world-space vertex into a camera-space vertex
 	vec3 camera_vertex = world_vertex.pos - scene.camera_.position;
@@ -280,7 +280,7 @@ void VertexShader(const Vertex& world_vertex, Scene &scene, Pixel& p)
 	p.z_inv = camera_vertex.z == 0.0f ? std::numeric_limits<float>::max() : 1.0f/camera_vertex.z;
 }
 
-void ComputeLine(Pixel a, Pixel b, std::vector<Pixel> &line)
+void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line)
 {
 	int delta_x = glm::abs(a.pos.x - b.pos.x);
 	int delta_y = glm::abs(a.pos.y - b.pos.y);
