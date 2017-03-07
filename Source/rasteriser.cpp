@@ -143,6 +143,11 @@ void Draw(const Scene &scene, const std::vector<Triangle> &triangles, std::vecto
 		}
 	}
 
+	for (auto light : scene.lights_)
+	{
+		light.UpdateCameraSpacePosition(scene.camera_);
+	}
+
 	for (auto triangle : triangles)
 	{
 		DrawTriangle(triangle, scene, depth_buffer);
@@ -271,7 +276,7 @@ void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth
 		{
 			// Compute the camera-space vector between the 3d position of the pixel and the light source
 			// TODO: cache this while camera and light static
-			vec3 camera_position_to_light = light.TransformToCameraSpace(scene.camera_) - pixel.camera_pos;
+			vec3 camera_position_to_light = light.camera_position - pixel.camera_pos;
 			camera_position_to_light = glm::rotate(camera_position_to_light, glm::radians(scene.camera_.pitch), vec3(1.0f, 0.0f, 0.0f));
 			camera_position_to_light = glm::rotate(camera_position_to_light, glm::radians(scene.camera_.yaw), vec3(0.0f, 1.0f, 0.0f));
 			camera_position_to_light = glm::rotate(camera_position_to_light, glm::radians(scene.camera_.roll), vec3(0.0f, 0.0f, 1.0f));

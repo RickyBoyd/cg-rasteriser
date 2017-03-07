@@ -9,13 +9,15 @@ struct Light {
 	glm::vec3 position; // world space position of the light
 	glm::vec3 color; // rgb light colour, 0.0f-1.0f
 
-	glm::vec3 TransformToCameraSpace(const Camera& camera) const
+	glm::vec3 camera_position;
+
+	void UpdateCameraSpacePosition(const Camera& camera)
 	{
 		glm::vec3 camera_space_position = position - camera.position;
 		camera_space_position = glm::rotate(camera_space_position, glm::radians(camera.pitch), glm::vec3(1.0f, 0.0f, 0.0f));
 		camera_space_position = glm::rotate(camera_space_position, glm::radians(camera.yaw), glm::vec3(0.0f, 1.0f, 0.0f));
 		camera_space_position = glm::rotate(camera_space_position, glm::radians(camera.roll), glm::vec3(0.0f, 0.0f, 1.0f));
-		return camera_space_position;
+		camera_position = camera_space_position;
 	}
 };
 
