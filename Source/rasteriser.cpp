@@ -45,42 +45,39 @@ SDL_Surface *screen;
 int t;
 const float FOCAL_LENGTH = SCREEN_WIDTH / 2;
 
-void Update(Scene &scene, Uint8 &lightSelected);
-
+void Update(Scene &scene, Uint8 &light_selected);
 void Draw(Scene &scene, const std::vector<Triangle> &triangles, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT]);
 
 void VertexShader(const vec3& v, Scene &scene, Pixel& p);
-
-void ComputeLine( Pixel a, Pixel b, std::vector<Pixel> &line );
-
+void ComputeLine(Pixel a, Pixel b, std::vector<Pixel> &line);
 void DrawPolygonEdges(const std::vector<vec3>& vertices, Scene &scene);
-void DrawPolygonRows( const std::vector<Pixel>& leftPixels, const std::vector<Pixel>& rightPixels, vec3 color, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT] );
-void DrawPolygon( const std::vector<vec3>& vertices, vec3 color, Scene& scene, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT] );
-void ComputePolygonRows(const std::vector<Pixel>& vertexPixels, std::vector<Pixel>& leftPixels, std::vector<Pixel>& rightPixels );
+void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, vec3 color, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT]);
+void DrawPolygon(const std::vector<vec3>& vertices, vec3 color, Scene& scene, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT]);
+void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pixel>& left_pixels, std::vector<Pixel>& right_pixels);
 
 int main(int argc, char *argv[]) {
 	screen = InitializeSDL(SCREEN_WIDTH, SCREEN_HEIGHT);
 	t = SDL_GetTicks();    // Set start value for timer.
 
-	Uint8 lightSelected = 0;
+	Uint8 light_selected = 0;
 
-	auto cubeScene = Scene(
+	auto cube_scene = Scene(
 		std::vector<ModelInstance> { ModelInstance(Model("Resources/cube.obj")) },
 		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
 		Camera{ glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f, 1.0f });
 
-	auto cornellBoxScene = Scene(
+	auto cornell_box_scene = Scene(
 		std::vector<ModelInstance> { ModelInstance(Model("Resources/cornell_box.obj")) },
 		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
 		Camera{ glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f, 0.4f });
 
-	auto cornellBoxTransparentScene = Scene(
+	auto cornell_box_transparent_scene = Scene(
 		std::vector<ModelInstance> { ModelInstance(Model("Resources/cornell_box_transparency.obj")) },
 		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
 		Camera{ glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f, 1.0f });
 
 #ifdef IMPORT_COMPLEX_MODELS
-	auto bunnyBoxScene = Scene(
+	auto bunny_box_scene = Scene(
 		std::vector<ModelInstance> {
 		ModelInstance(Model("Resources/cornell_box_empty.obj")),
 			ModelInstance(Model("Resources/bunny_transparent.obj"), glm::vec3(0.0f, -1.5f, 0.0f), glm::vec3(12.0f, 12.0f, 12.0f))
@@ -88,14 +85,14 @@ int main(int argc, char *argv[]) {
 		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
 			Camera{ glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f });
 
-	auto bunnyScene = Scene(
+	auto bunny_scene = Scene(
 		std::vector<ModelInstance> { ModelInstance(Model("Resources/bunny.obj"), glm::vec3(0.0f, 0.0f, 0.0f)) },
 		std::vector<Light> {
 		Light{ vec3(0.0f, 0.5f, -1.0f), 15.0f * vec3(1,1,1) },
 			Light{ vec3(0.5f, 0.1f, 0.0f), 15.0f * vec3(1,1,1) }},
 		Camera{ glm::vec3(0.0f, 0.1f, -0.15f), 0.0f, 0.0f, 0.0f });
 
-	auto teapotScene = Scene(
+	auto teapot_scene = Scene(
 		std::vector<ModelInstance> {
 		ModelInstance(Model("Resources/teapot.obj"), glm::vec3(-3.0f, 0.0f, 0.0f)),
 			ModelInstance(Model("Resources/cube.obj"), glm::vec3(3.0f, 0.0f, 0.0f))
@@ -107,16 +104,16 @@ int main(int argc, char *argv[]) {
 			Camera{ glm::vec3(0.0f, 4.0f, -7.0f), 30.0f, 0.0f, 0.0f });
 #endif
 
-	Scene &scene = cornellBoxScene;
+	Scene &scene = cornell_box_scene;
 
-	std::vector<Triangle> sceneTris = scene.ToTriangles();
-	std::cout << "Loaded " << sceneTris.size() << " tris" << std::endl;
+	std::vector<Triangle> scene_tris = scene.ToTriangles();
+	std::cout << "Loaded " << scene_tris.size() << " tris" << std::endl;
 
 	float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT];
 
 	while (NoQuitMessageSDL()) {
-		Draw(scene, sceneTris, depth_buffer);
-		Update(scene, lightSelected);
+		Draw(scene, scene_tris, depth_buffer);
+		Update(scene, light_selected);
 	}
 
 	SDL_SaveBMP(screen, "screenshot.bmp");
@@ -170,12 +167,12 @@ void DrawPolygon(const std::vector<vec3>& vertices, vec3 color, Scene& scene, fl
 	DrawPolygonRows(left_pixels, right_pixels, color, depth_buffer);
 }
 
-void DrawPolygonRows(const std::vector<Pixel>& leftPixels, const std::vector<Pixel>& rightPixels, vec3 color, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT])
+void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, vec3 color, float depth_buffer[SCREEN_WIDTH][SCREEN_HEIGHT])
 {
-	for (int i = 0; i < leftPixels.size(); i++)
+	for (int i = 0; i < left_pixels.size(); i++)
 	{
 		std::vector<Pixel> row;
-		ComputeLine(leftPixels[i], rightPixels[i], row);
+		ComputeLine(left_pixels[i], right_pixels[i], row);
 		for (auto pixel : row)
 		{
 			if (pixel.pos.x >= 0 && pixel.pos.x < SCREEN_WIDTH && pixel.pos.y >= 0 && pixel.pos.y < SCREEN_HEIGHT)
@@ -290,95 +287,95 @@ void ComputeLine(Pixel a, Pixel b, std::vector<Pixel> &line)
 	Interpolate(a, b, line);
 }
 
-void Update(Scene &scene, Uint8 &lightSelected) {
+void Update(Scene &scene, Uint8 &light_selected) {
 	// Compute frame time:
 	int t2 = SDL_GetTicks();
 	float dt = float(t2 - t);
 	t = t2;
 	std::cout << "Render time: " << dt << " ms.\n";
 
-	static float movementSpeed = 0.001;
-	static float rotateSpeed = 0.01;
+	static float movement_speed = 0.001;
+	static float rotate_speed = 0.01;
 
 	auto keystate = SDL_GetKeyState(nullptr);
 	if (keystate[SDLK_UP]) {
-		scene.camera_.position.y += dt * movementSpeed;
+		scene.camera_.position.y += dt * movement_speed;
 	}
 	if (keystate[SDLK_DOWN]) {
-		scene.camera_.position.y -= dt * movementSpeed;
+		scene.camera_.position.y -= dt * movement_speed;
 	}
 	if (keystate[SDLK_LEFT]) {
-		scene.camera_.position.x -= dt * movementSpeed;
+		scene.camera_.position.x -= dt * movement_speed;
 	}
 	if (keystate[SDLK_RIGHT]) {
-		scene.camera_.position.x += dt * movementSpeed;
+		scene.camera_.position.x += dt * movement_speed;
 	}
 	if (keystate[SDLK_w]) {
-		scene.lights_[lightSelected].position += vec3(0.0f, 0.0f, movementSpeed * dt);
+		scene.lights_[light_selected].position += vec3(0.0f, 0.0f, movement_speed * dt);
 	}
 	if (keystate[SDLK_s]) {
-		scene.lights_[lightSelected].position += vec3(0.0f, 0.0f, -movementSpeed * dt);
+		scene.lights_[light_selected].position += vec3(0.0f, 0.0f, -movement_speed * dt);
 	}
 	if (keystate[SDLK_a]) {
-		scene.lights_[lightSelected].position += vec3(-movementSpeed * dt, 0.0f, 0.0f);
+		scene.lights_[light_selected].position += vec3(-movement_speed * dt, 0.0f, 0.0f);
 	}
 	if (keystate[SDLK_d]) {
-		scene.lights_[lightSelected].position += vec3(movementSpeed * dt, 0.0f, 0.0f);
+		scene.lights_[light_selected].position += vec3(movement_speed * dt, 0.0f, 0.0f);
 	}
 	if (keystate[SDLK_q]) {
-		scene.lights_[lightSelected].position += vec3(0.0f, movementSpeed * dt, 0.0f);
+		scene.lights_[light_selected].position += vec3(0.0f, movement_speed * dt, 0.0f);
 	}
 	if (keystate[SDLK_e]) {
-		scene.lights_[lightSelected].position += vec3(0.0f, -movementSpeed * dt, 0.0f);
+		scene.lights_[light_selected].position += vec3(0.0f, -movement_speed * dt, 0.0f);
 	}
 	if (keystate[SDLK_n]) {
 		if (scene.lights_.size() < 6) {
 			//AddLight(vec3(0.0f, 0.0f, 0.0f), 10.0f * vec3(1.0f, 1.0f, 1.0f), scene.lights_);
-			//lightSelected = static_cast<Uint8>(scene.lights_.size()) - 1;
+			//light_selected = static_cast<Uint8>(scene.lights_.size()) - 1;
 		}
 	}
 
 	if (keystate[SDLK_j])
 	{
-		scene.camera_.yaw -= dt * rotateSpeed;
+		scene.camera_.yaw -= dt * rotate_speed;
 	}
 	if (keystate[SDLK_l])
 	{
-		scene.camera_.yaw += dt * rotateSpeed;
+		scene.camera_.yaw += dt * rotate_speed;
 	}
 	if (keystate[SDLK_i])
 	{
-		scene.camera_.pitch -= dt * rotateSpeed;
+		scene.camera_.pitch -= dt * rotate_speed;
 	}
 	if (keystate[SDLK_k])
 	{
-		scene.camera_.pitch += dt * rotateSpeed;
+		scene.camera_.pitch += dt * rotate_speed;
 	}
 	if (keystate[SDLK_u])
 	{
-		scene.camera_.roll -= dt * rotateSpeed;
+		scene.camera_.roll -= dt * rotate_speed;
 	}
 	if (keystate[SDLK_o])
 	{
-		scene.camera_.roll += dt * rotateSpeed;
+		scene.camera_.roll += dt * rotate_speed;
 	}
 
 	if (keystate[SDLK_1] && scene.lights_.size() > 0) {
-		lightSelected = 0;
+		light_selected = 0;
 	}
 	if (keystate[SDLK_2] && scene.lights_.size() > 1) {
-		lightSelected = 1;
+		light_selected = 1;
 	}
 	if (keystate[SDLK_3] && scene.lights_.size() > 2) {
-		lightSelected = 2;
+		light_selected = 2;
 	}
 	if (keystate[SDLK_4] && scene.lights_.size() > 3) {
-		lightSelected = 3;
+		light_selected = 3;
 	}
 	if (keystate[SDLK_5] && scene.lights_.size() > 4) {
-		lightSelected = 4;
+		light_selected = 4;
 	}
 	if (keystate[SDLK_6] && scene.lights_.size() > 5) {
-		lightSelected = 5;
+		light_selected = 5;
 	}
 }
