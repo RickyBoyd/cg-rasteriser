@@ -20,9 +20,10 @@ class Scene
 public:
 	std::vector<ModelInstance> model_instances_;
 	std::vector<Light> lights_;
+	glm::vec3 indirect_light_;
 	Camera camera_;
 
-	Scene(std::vector<ModelInstance> model_instances, std::vector<Light> lights_, Camera camera);
+	Scene(std::vector<ModelInstance> model_instances, std::vector<Light> lights, glm::vec3 indirect_light, Camera camera);
 	~Scene();
 
 	std::vector<Triangle> ToTriangles() const;

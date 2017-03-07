@@ -1,18 +1,47 @@
 #include "Utilities.h"
 #include <glm/detail/type_vec3.hpp>
 #include <algorithm>
+#include <glm/detail/func_common.hpp>
+
+Pixel Pixel::operator + (const Pixel p) const {
+	return Pixel{
+		pos + p.pos,
+		z_inv + p.z_inv,
+		illumination + p.illumination
+	};
+}
+
+Pixel Pixel::operator - (const Pixel p) const {
+	return Pixel{
+		pos - p.pos,
+		z_inv - p.z_inv,
+		illumination - p.illumination
+	};
+}
+
+Pixel Pixel::operator / (const float divisor) const {
+	return Pixel{
+		glm::vec2(pos) / divisor,
+		z_inv / divisor,
+		illumination / divisor
+	};
+}
+
+glm::ivec2 Pixel::ipos() const
+{
+	return glm::round(pos);
+}
 
 void Interpolate(const Pixel a, const Pixel b, std::vector<Pixel>& result)
 {
 	int N = result.size();
-	glm::vec3 a_vec(a.pos.x, a.pos.y, a.z_inv);
-	glm::vec3 b_vec(b.pos.x, b.pos.y, b.z_inv);
-	glm::vec3 step = glm::vec3(b_vec - a_vec) / float(std::max(N - 1, 1));
-	glm::vec3 current(a_vec);
+	auto step = (b - a) / float(std::max(N - 1, 1));
+
+	auto current = a;
 	for (int i = 0; i < N; ++i)
 	{
-		result[i] = { glm::ivec2(round(current.x), round(current.y)), current.z };
-		current += step;
+		result[i] = current;
+		current = current + step;
 	}
 }
 

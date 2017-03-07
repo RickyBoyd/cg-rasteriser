@@ -2,8 +2,8 @@
 
 
 
-Scene::Scene(std::vector<ModelInstance> model_instances, std::vector<Light> lights, Camera camera) 
-	: model_instances_(model_instances), lights_(lights), camera_(camera)
+Scene::Scene(std::vector<ModelInstance> model_instances, std::vector<Light> lights, glm::vec3 indirect_light, Camera camera) 
+	: model_instances_(model_instances), lights_(lights), indirect_light_(indirect_light), camera_(camera)
 {
 }
 

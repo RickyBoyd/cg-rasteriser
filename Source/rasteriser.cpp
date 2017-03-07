@@ -48,12 +48,13 @@ const float FOCAL_LENGTH = SCREEN_WIDTH / 2;
 void Update(Scene &scene, Uint8 &light_selected);
 void Draw(const Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer);
 
-void ShadeVertex(const Vertex& v, const Scene &scene, Pixel& p);
 void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line);
-void DrawPolygonEdges(const std::vector<Vertex>& vertices, const Scene &scene);
-void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const vec3 color, std::vector<float>& depth_buffer);
 void DrawPolygon(const std::vector<Vertex>& vertices, const vec3 color, const Scene& scene, std::vector<float>& depth_buffer);
 void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pixel>& left_pixels, std::vector<Pixel>& right_pixels);
+void DrawPolygonEdges(const std::vector<Vertex>& vertices, const Scene &scene);
+void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, std::vector<float>& depth_buffer);
+void DrawPixel(const Pixel& pixel, std::vector<float>& depth_buffer);
+void ShadeVertex(const Vertex& v, const Scene &scene, Pixel& p);
 
 int main(int argc, char *argv[]) {
 	screen = InitializeSDL(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -64,16 +65,19 @@ int main(int argc, char *argv[]) {
 	auto cube_scene = Scene(
 		std::vector<ModelInstance> { ModelInstance(Model("Resources/cube.obj")) },
 		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
+		0.2f * glm::vec3(1.0f, 1.0f, 1.0f),
 		Camera{ glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f, 1.0f });
 
 	auto cornell_box_scene = Scene(
 		std::vector<ModelInstance> { ModelInstance(Model("Resources/cornell_box.obj")) },
 		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
+		0.2f * glm::vec3(1.0f, 1.0f, 1.0f),
 		Camera{ glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f, 0.4f });
 
 	auto cornell_box_transparent_scene = Scene(
 		std::vector<ModelInstance> { ModelInstance(Model("Resources/cornell_box_transparency.obj")) },
 		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
+		0.2f * glm::vec3(1.0f, 1.0f, 1.0f),
 		Camera{ glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f, 1.0f });
 
 #ifdef IMPORT_COMPLEX_MODELS
@@ -83,6 +87,7 @@ int main(int argc, char *argv[]) {
 			ModelInstance(Model("Resources/bunny_transparent.obj"), glm::vec3(0.0f, -1.5f, 0.0f), glm::vec3(12.0f, 12.0f, 12.0f))
 	},
 		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
+			0.2f * glm::vec3(1.0f, 1.0f, 1.0f),
 			Camera{ glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f });
 
 	auto bunny_scene = Scene(
@@ -90,6 +95,7 @@ int main(int argc, char *argv[]) {
 		std::vector<Light> {
 		Light{ vec3(0.0f, 0.5f, -1.0f), 15.0f * vec3(1,1,1) },
 			Light{ vec3(0.5f, 0.1f, 0.0f), 15.0f * vec3(1,1,1) }},
+		0.2f * glm::vec3(1.0f, 1.0f, 1.0f),
 		Camera{ glm::vec3(0.0f, 0.1f, -0.15f), 0.0f, 0.0f, 0.0f });
 
 	auto teapot_scene = Scene(
@@ -101,6 +107,7 @@ int main(int argc, char *argv[]) {
 			Light{ vec3(3.0f, 2.0f, 0.0f), 100.0f * vec3(1,1,1) },
 				Light{ vec3(-3.0f, 4.0f, 2.0f), 100.0f * vec3(1,1,1) },
 				Light{ vec3(-3.0f, 4.0f, -2.0f), 30.0f * vec3(1,1,1) }},
+			0.2f * glm::vec3(1.0f, 1.0f, 1.0f),
 			Camera{ glm::vec3(0.0f, 4.0f, -7.0f), 30.0f, 0.0f, 0.0f });
 #endif
 
@@ -139,12 +146,12 @@ void Draw(const Scene &scene, const std::vector<Triangle> &triangles, std::vecto
 		}
 	}
 
+	std::vector<Vertex> vertices(3);
 	for (auto triangle : triangles)
 	{
-		std::vector<Vertex> vertices(3);
-		vertices[0] = Vertex{ triangle.v0 };
-		vertices[1] = Vertex{ triangle.v1 };
-		vertices[2] = Vertex{ triangle.v2 };
+		vertices[0] = Vertex{ triangle.v0, triangle.normal, triangle.color, triangle.color };
+		vertices[1] = Vertex{ triangle.v1, triangle.normal, triangle.color, triangle.color };
+		vertices[2] = Vertex{ triangle.v2, triangle.normal, triangle.color, triangle.color };
 
 		DrawPolygon(vertices, triangle.color, scene, depth_buffer);
 		//DrawPolygonEdges(vertices, scene);
@@ -152,6 +159,15 @@ void Draw(const Scene &scene, const std::vector<Triangle> &triangles, std::vecto
 	if (SDL_MUSTLOCK(screen))
 		SDL_UnlockSurface(screen);
 	SDL_UpdateRect(screen, 0, 0, 0, 0);
+}
+
+void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line)
+{
+	int delta_x = glm::abs(a.pos.x - b.pos.x);
+	int delta_y = glm::abs(a.pos.y - b.pos.y);
+	int pixels = glm::max(delta_x, delta_y) + 1; // TODO: why +1?
+	line.resize(pixels);
+	Interpolate(a, b, line);
 }
 
 void DrawPolygon(const std::vector<Vertex>& vertices, const vec3 color, const Scene& scene, std::vector<float>& depth_buffer)
@@ -166,27 +182,7 @@ void DrawPolygon(const std::vector<Vertex>& vertices, const vec3 color, const Sc
 	std::vector<Pixel> left_pixels;
 	std::vector<Pixel> right_pixels;
 	ComputePolygonRows(vertex_pixels, left_pixels, right_pixels);
-	DrawPolygonRows(left_pixels, right_pixels, color, depth_buffer);
-}
-
-void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const vec3 color, std::vector<float>& depth_buffer)
-{
-	for (int i = 0; i < left_pixels.size(); i++)
-	{
-		std::vector<Pixel> row;
-		ComputeLine(left_pixels[i], right_pixels[i], row);
-		for (auto pixel : row)
-		{
-			if (pixel.pos.x >= 0 && pixel.pos.x < SCREEN_WIDTH && pixel.pos.y >= 0 && pixel.pos.y < SCREEN_HEIGHT)
-			{
-				if (pixel.z_inv > depth_buffer[pixel.pos.y * SCREEN_WIDTH + pixel.pos.x])
-				{
-					depth_buffer[pixel.pos.y * SCREEN_WIDTH + pixel.pos.x] = pixel.z_inv;
-					PutPixelSDL(screen, pixel.pos.x, pixel.pos.y, color);
-				}
-			}
-		}
-	}
+	DrawPolygonRows(left_pixels, right_pixels, depth_buffer);
 }
 
 void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pixel>& left_pixels, std::vector<Pixel>& right_pixels)
@@ -198,8 +194,8 @@ void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pix
 
 	for (auto vertex : vertex_pixels)
 	{
-		min_y = std::min(vertex.pos.y, min_y);
-		max_y = std::max(vertex.pos.y, max_y);
+		min_y = std::min(vertex.ipos().y, min_y);
+		max_y = std::max(vertex.ipos().y, max_y);
 	}
 	int rows = max_y - min_y + 1;
 
@@ -225,7 +221,7 @@ void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pix
 		ComputeLine(vertex_pixels[i], vertex_pixels[j], line);
 		for (auto line_pixel : line)
 		{
-			int row = line_pixel.pos.y - min_y;
+			int row = line_pixel.ipos().y - min_y;
 			if (row >= rows)
 			{
 				std::cout << "row (" << row << ") is greater than number of rows (" << rows << ")" << std::endl;
@@ -234,13 +230,11 @@ void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pix
 			{
 				if (line_pixel.pos.x < left_pixels[row].pos.x)
 				{
-					left_pixels[row].z_inv = line_pixel.z_inv;
-					left_pixels[row].pos.x = line_pixel.pos.x;
+					left_pixels[row] = line_pixel;
 				}
 				if (line_pixel.pos.x > right_pixels[row].pos.x)
 				{
-					right_pixels[row].z_inv = line_pixel.z_inv;
-					right_pixels[row].pos.x = line_pixel.pos.x;
+					right_pixels[row] = line_pixel;
 				}
 			}
 		}
@@ -267,26 +261,60 @@ void DrawPolygonEdges(const std::vector<Vertex>& vertices, const Scene &scene)
 	}
 }
 
+void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, std::vector<float>& depth_buffer)
+{
+	for (int i = 0; i < left_pixels.size(); i++)
+	{
+		std::vector<Pixel> row;
+		ComputeLine(left_pixels[i], right_pixels[i], row);
+		for (auto pixel : row)
+		{
+			if (pixel.pos.x >= 0 && pixel.pos.x < SCREEN_WIDTH && pixel.pos.y >= 0 && pixel.pos.y < SCREEN_HEIGHT)
+			{
+				DrawPixel(pixel, depth_buffer);
+			}
+		}
+	}
+}
+
+void DrawPixel(const Pixel& pixel, std::vector<float>& depth_buffer)
+{
+	if (pixel.z_inv > depth_buffer[pixel.ipos().y * SCREEN_WIDTH + pixel.ipos().x])
+	{
+		depth_buffer[pixel.ipos().y * SCREEN_WIDTH + pixel.ipos().x] = pixel.z_inv;
+		PutPixelSDL(screen, pixel.ipos().x, pixel.ipos().y, pixel.illumination);
+	}
+}
+
 void ShadeVertex(const Vertex& world_vertex, const Scene &scene, Pixel& p)
 {
 	// Convert the world-space vertex into a camera-space vertex
-	vec3 camera_vertex = world_vertex.pos - scene.camera_.position;
-	camera_vertex = glm::rotate(camera_vertex, glm::radians(scene.camera_.pitch), vec3(1.0f, 0.0f, 0.0f));
-	camera_vertex = glm::rotate(camera_vertex, glm::radians(scene.camera_.yaw), vec3(0.0f, 1.0f, 0.0f));
-	camera_vertex = glm::rotate(camera_vertex, glm::radians(scene.camera_.roll), vec3(0.0f, 0.0f, 1.0f));
+	// TODO: cache all these computations
+	vec3 camera_vertex_position = world_vertex.pos - scene.camera_.position;
+	camera_vertex_position = glm::rotate(camera_vertex_position, glm::radians(scene.camera_.pitch), vec3(1.0f, 0.0f, 0.0f));
+	camera_vertex_position = glm::rotate(camera_vertex_position, glm::radians(scene.camera_.yaw), vec3(0.0f, 1.0f, 0.0f));
+	camera_vertex_position = glm::rotate(camera_vertex_position, glm::radians(scene.camera_.roll), vec3(0.0f, 0.0f, 1.0f));
 
-	p.pos.x = SCREEN_WIDTH *  ( scene.camera_.focal_length * camera_vertex.x / camera_vertex.z + 1.0f / 2.0f);
-	p.pos.y = SCREEN_HEIGHT * (-scene.camera_.focal_length * camera_vertex.y / camera_vertex.z + 1.0f / 2.0f);
-	p.z_inv = camera_vertex.z == 0.0f ? std::numeric_limits<float>::max() : 1.0f/camera_vertex.z;
-}
+	vec3 camera_vertex_normal = world_vertex.normal;
+	camera_vertex_normal = glm::rotate(camera_vertex_normal, glm::radians(scene.camera_.pitch), vec3(1.0f, 0.0f, 0.0f));
+	camera_vertex_normal = glm::rotate(camera_vertex_normal, glm::radians(scene.camera_.yaw), vec3(0.0f, 1.0f, 0.0f));
+	camera_vertex_normal = glm::rotate(camera_vertex_normal, glm::radians(scene.camera_.roll), vec3(0.0f, 0.0f, 1.0f));
 
-void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line)
-{
-	int delta_x = glm::abs(a.pos.x - b.pos.x);
-	int delta_y = glm::abs(a.pos.y - b.pos.y);
-	int pixels = glm::max(delta_x, delta_y) + 1; // TODO: why +1?
-	line.resize(pixels);
-	Interpolate(a, b, line);
+	p.pos.x = SCREEN_WIDTH * ( scene.camera_.focal_length * camera_vertex_position.x / camera_vertex_position.z + 1.0f / 2.0f);
+	p.pos.y = SCREEN_HEIGHT * (-scene.camera_.focal_length * camera_vertex_position.y / camera_vertex_position.z + 1.0f / 2.0f);
+	p.z_inv = camera_vertex_position.z == 0.0f ? std::numeric_limits<float>::max() : 1.0f/camera_vertex_position.z;
+	
+	p.illumination = glm::vec3(0.0f);
+	for (auto light : scene.lights_)
+	{
+		vec3 camera_vertex_to_light = light.position - world_vertex.pos;
+		camera_vertex_to_light = glm::rotate(camera_vertex_to_light, glm::radians(scene.camera_.pitch), vec3(1.0f, 0.0f, 0.0f));
+		camera_vertex_to_light = glm::rotate(camera_vertex_to_light, glm::radians(scene.camera_.yaw), vec3(0.0f, 1.0f, 0.0f));
+		camera_vertex_to_light = glm::rotate(camera_vertex_to_light, glm::radians(scene.camera_.roll), vec3(0.0f, 0.0f, 1.0f));
+
+		 vec3 direct_light = light.color * std::max(glm::dot(glm::normalize(camera_vertex_to_light), glm::normalize(camera_vertex_normal)), 0.0f) / float(4.0f * M_PI * glm::dot(camera_vertex_to_light, camera_vertex_to_light));
+		 p.illumination += direct_light * world_vertex.diffuse_reflectance + scene.indirect_light_ * world_vertex.indirect_reflectance;
+	}
 }
 
 void Update(Scene &scene, Uint8 &light_selected) {
