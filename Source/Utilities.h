@@ -6,16 +6,16 @@
 struct Vertex
 {
 	glm::vec3 pos;
-	glm::vec3 normal;
-	glm::vec3 diffuse_reflectance;
-	glm::vec3 indirect_reflectance;
 };
 
 struct Pixel
 {
-	glm::ivec2 pos;
+	glm::ivec2 pos; // 2d position on screen
 	float z_inv;
-	glm::vec3 illumination;
+	glm::vec3 camera_pos; // 3d position in camera coordinate system
+	glm::vec3 camera_normal; // normal in camera coordinate system
+	glm::vec3 diffuse_reflectance;
+	glm::vec3 indirect_reflectance;
 };
 
 void Interpolate(const Pixel a, const Pixel b, std::vector<Pixel>& result);

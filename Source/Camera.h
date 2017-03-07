@@ -3,7 +3,7 @@
 
 struct Camera
 {
-	glm::vec3 position;
+	glm::vec3 position; // world space position of the camera
 	float pitch;
 	float yaw;
 	float roll;

@@ -8,12 +8,10 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <glm/detail/type_mat.hpp>
-#include <glm/detail/type_mat.hpp>
 #include <algorithm>
 #include "Model.h"
 #include "Light.h"
 #include "Scene.h"
-#include "Material.h"
 #include "Utilities.h"
 
 #define EDGE_AA
@@ -29,7 +27,6 @@ extern "C" {
 
 #if defined(_DEBUG) && (defined _WIN32 || defined _WIN64)
 #define _CRTDBG_MAP_ALLOC
-#include <stdlib.h>
 #include <crtdbg.h>	
 #endif
 
@@ -49,12 +46,12 @@ void Update(Scene &scene, Uint8 &light_selected);
 void Draw(const Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer);
 
 void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line);
-void DrawPolygon(const std::vector<Vertex>& vertices, const vec3 color, const Scene& scene, std::vector<float>& depth_buffer);
+void DrawTriangle(const Triangle& triangle, const Scene& scene, std::vector<float>& depth_buffer);
 void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pixel>& left_pixels, std::vector<Pixel>& right_pixels);
-void DrawPolygonEdges(const std::vector<Vertex>& vertices, const Scene &scene);
-void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, std::vector<float>& depth_buffer);
-void DrawPixel(const Pixel& pixel, std::vector<float>& depth_buffer);
-void ShadeVertex(const Vertex& v, const Scene &scene, Pixel& p);
+void DrawTriangleEdges(const Triangle& triangle, const Scene &scene);
+void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const Scene& scene, std::vector<float>& depth_buffer);
+void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth_buffer);
+Pixel VertexToPixel(const glm::vec3 world_vertex, const Triangle& triangle, const Scene &scene);
 
 int main(int argc, char *argv[]) {
 	screen = InitializeSDL(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -146,15 +143,10 @@ void Draw(const Scene &scene, const std::vector<Triangle> &triangles, std::vecto
 		}
 	}
 
-	std::vector<Vertex> vertices(3);
 	for (auto triangle : triangles)
 	{
-		vertices[0] = Vertex{ triangle.v0, triangle.normal, triangle.color, triangle.color };
-		vertices[1] = Vertex{ triangle.v1, triangle.normal, triangle.color, triangle.color };
-		vertices[2] = Vertex{ triangle.v2, triangle.normal, triangle.color, triangle.color };
-
-		DrawPolygon(vertices, triangle.color, scene, depth_buffer);
-		//DrawPolygonEdges(vertices, scene);
+		DrawTriangle(triangle, scene, depth_buffer);
+		//DrawTriangleEdges(triangle, scene);
 	}
 	if (SDL_MUSTLOCK(screen))
 		SDL_UnlockSurface(screen);
@@ -170,19 +162,17 @@ void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line)
 	Interpolate(a, b, line);
 }
 
-void DrawPolygon(const std::vector<Vertex>& vertices, const vec3 color, const Scene& scene, std::vector<float>& depth_buffer)
+void DrawTriangle(const Triangle& triangle, const Scene& scene, std::vector<float>& depth_buffer)
 {
-	int num_vertices = vertices.size();
-	std::vector<Pixel> vertex_pixels(num_vertices);
-	for (int i = 0; i < num_vertices; ++i)
-	{
-		ShadeVertex(vertices[i], scene, vertex_pixels[i]);
-	}
+	std::vector<Pixel> vertex_pixels(3);
+	vertex_pixels[0] = VertexToPixel(triangle.v0, triangle, scene);
+	vertex_pixels[1] = VertexToPixel(triangle.v1, triangle, scene);
+	vertex_pixels[2] = VertexToPixel(triangle.v2, triangle, scene);
 
 	std::vector<Pixel> left_pixels;
 	std::vector<Pixel> right_pixels;
 	ComputePolygonRows(vertex_pixels, left_pixels, right_pixels);
-	DrawPolygonRows(left_pixels, right_pixels, depth_buffer);
+	DrawPolygonRows(left_pixels, right_pixels, scene, depth_buffer);
 }
 
 void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pixel>& left_pixels, std::vector<Pixel>& right_pixels)
@@ -241,27 +231,20 @@ void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pix
 	}
 }
 
-void DrawPolygonEdges(const std::vector<Vertex>& vertices, const Scene &scene)
+void DrawTriangleEdges(const Triangle& triangle, const Scene &scene)
 {
-	// Transform each vertex from 3D world position to 2D image position:
-	std::vector<Pixel> pixels(vertices.size());
-	std::transform(vertices.begin(), vertices.end(), pixels.begin(), [&scene](Vertex vertex) -> Pixel
-	{
-		Pixel p;
-		ShadeVertex(vertex, scene, p);
-		return p;
-	});
-	// Loop over all vertices and draw the edge from it to the next vertex:
-	int num_vertices = vertices.size();
-	for (int i = 0; i < num_vertices; ++i)
-	{
-		int j = (i + 1) % num_vertices; // The next vertex
-		vec3 color(1, 1, 1);
-		DrawLineSDL(screen, pixels[i].pos, pixels[j].pos, color);
-	}
+	// Transform each vertex from 3D world position to 2D image position
+	auto p0 = VertexToPixel(triangle.v0, triangle, scene);
+	auto p1 = VertexToPixel(triangle.v1, triangle, scene);
+	auto p2 = VertexToPixel(triangle.v2, triangle, scene);
+
+	vec3 color(1, 1, 1);
+	DrawLineSDL(screen, p0.pos, p1.pos, color);
+	DrawLineSDL(screen, p1.pos, p2.pos, color);
+	DrawLineSDL(screen, p2.pos, p0.pos, color);
 }
 
-void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, std::vector<float>& depth_buffer)
+void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const Scene& scene, std::vector<float>& depth_buffer)
 {
 	for (int i = 0; i < left_pixels.size(); i++)
 	{
@@ -271,50 +254,60 @@ void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pi
 		{
 			if (pixel.pos.x >= 0 && pixel.pos.x < SCREEN_WIDTH && pixel.pos.y >= 0 && pixel.pos.y < SCREEN_HEIGHT)
 			{
-				DrawPixel(pixel, depth_buffer);
+				DrawPixel(pixel, scene, depth_buffer);
 			}
 		}
 	}
 }
 
-void DrawPixel(const Pixel& pixel, std::vector<float>& depth_buffer)
+void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth_buffer)
 {
 	if (pixel.z_inv > depth_buffer[pixel.pos.y * SCREEN_WIDTH + pixel.pos.x])
 	{
 		depth_buffer[pixel.pos.y * SCREEN_WIDTH + pixel.pos.x] = pixel.z_inv;
-		PutPixelSDL(screen, pixel.pos.x, pixel.pos.y, pixel.illumination);
+
+		auto illumination = glm::vec3(0.0f);
+		for (auto light : scene.lights_)
+		{
+			// Compute the camera-space vector between the 3d position of the pixel and the light source
+			// TODO: cache this while camera and light static
+			vec3 camera_position_to_light = light.TransformToCameraSpace(scene.camera_) - pixel.camera_pos;
+			camera_position_to_light = glm::rotate(camera_position_to_light, glm::radians(scene.camera_.pitch), vec3(1.0f, 0.0f, 0.0f));
+			camera_position_to_light = glm::rotate(camera_position_to_light, glm::radians(scene.camera_.yaw), vec3(0.0f, 1.0f, 0.0f));
+			camera_position_to_light = glm::rotate(camera_position_to_light, glm::radians(scene.camera_.roll), vec3(0.0f, 0.0f, 1.0f));
+
+			vec3 direct_light = light.color * std::max(abs(glm::dot(glm::normalize(camera_position_to_light), glm::normalize(pixel.camera_normal))), 0.0f) / float(4.0f * M_PI * glm::dot(camera_position_to_light, camera_position_to_light));
+			illumination += direct_light * pixel.diffuse_reflectance + scene.indirect_light_ * pixel.indirect_reflectance;
+		}
+
+		PutPixelSDL(screen, pixel.pos.x, pixel.pos.y, illumination);
 	}
 }
 
-void ShadeVertex(const Vertex& world_vertex, const Scene &scene, Pixel& p)
+Pixel VertexToPixel(const glm::vec3 world_vertex, const Triangle& triangle, const Scene &scene)
 {
-	// Convert the world-space vertex into a camera-space vertex
-	// TODO: cache all these computations
-	vec3 camera_vertex_position = world_vertex.pos - scene.camera_.position;
-	camera_vertex_position = glm::rotate(camera_vertex_position, glm::radians(scene.camera_.pitch), vec3(1.0f, 0.0f, 0.0f));
-	camera_vertex_position = glm::rotate(camera_vertex_position, glm::radians(scene.camera_.yaw), vec3(0.0f, 1.0f, 0.0f));
-	camera_vertex_position = glm::rotate(camera_vertex_position, glm::radians(scene.camera_.roll), vec3(0.0f, 0.0f, 1.0f));
-
-	vec3 camera_vertex_normal = world_vertex.normal;
+	vec3 camera_vertex_normal = triangle.normal;
 	camera_vertex_normal = glm::rotate(camera_vertex_normal, glm::radians(scene.camera_.pitch), vec3(1.0f, 0.0f, 0.0f));
 	camera_vertex_normal = glm::rotate(camera_vertex_normal, glm::radians(scene.camera_.yaw), vec3(0.0f, 1.0f, 0.0f));
 	camera_vertex_normal = glm::rotate(camera_vertex_normal, glm::radians(scene.camera_.roll), vec3(0.0f, 0.0f, 1.0f));
 
-	p.pos.x = SCREEN_WIDTH * ( scene.camera_.focal_length * camera_vertex_position.x / camera_vertex_position.z + 1.0f / 2.0f);
-	p.pos.y = SCREEN_HEIGHT * (-scene.camera_.focal_length * camera_vertex_position.y / camera_vertex_position.z + 1.0f / 2.0f);
-	p.z_inv = camera_vertex_position.z == 0.0f ? std::numeric_limits<float>::max() : 1.0f/camera_vertex_position.z;
-	
-	p.illumination = glm::vec3(0.0f);
-	for (auto light : scene.lights_)
-	{
-		vec3 camera_vertex_to_light = light.position - world_vertex.pos;
-		camera_vertex_to_light = glm::rotate(camera_vertex_to_light, glm::radians(scene.camera_.pitch), vec3(1.0f, 0.0f, 0.0f));
-		camera_vertex_to_light = glm::rotate(camera_vertex_to_light, glm::radians(scene.camera_.yaw), vec3(0.0f, 1.0f, 0.0f));
-		camera_vertex_to_light = glm::rotate(camera_vertex_to_light, glm::radians(scene.camera_.roll), vec3(0.0f, 0.0f, 1.0f));
+	// Convert the world-space vertex into a camera-space vertex
+	// TODO: cache all these computations
+	vec3 camera_vertex_position = world_vertex - scene.camera_.position;
+	camera_vertex_position = glm::rotate(camera_vertex_position, glm::radians(scene.camera_.pitch), vec3(1.0f, 0.0f, 0.0f));
+	camera_vertex_position = glm::rotate(camera_vertex_position, glm::radians(scene.camera_.yaw), vec3(0.0f, 1.0f, 0.0f));
+	camera_vertex_position = glm::rotate(camera_vertex_position, glm::radians(scene.camera_.roll), vec3(0.0f, 0.0f, 1.0f));
 
-		 vec3 direct_light = light.color * std::max(abs(glm::dot(glm::normalize(camera_vertex_to_light), glm::normalize(camera_vertex_normal))), 0.0f) / float(4.0f * M_PI * glm::dot(camera_vertex_to_light, camera_vertex_to_light));
-		 p.illumination += direct_light * world_vertex.diffuse_reflectance + scene.indirect_light_ * world_vertex.indirect_reflectance;
-	}
+	return Pixel{
+		glm::ivec2(
+			SCREEN_WIDTH * (scene.camera_.focal_length * camera_vertex_position.x / camera_vertex_position.z + 1.0f / 2.0f),
+			SCREEN_HEIGHT * (-scene.camera_.focal_length * camera_vertex_position.y / camera_vertex_position.z + 1.0f / 2.0f)),
+		camera_vertex_position.z == 0.0f ? std::numeric_limits<float>::max() : 1.0f / camera_vertex_position.z,
+		camera_vertex_position,
+		camera_vertex_normal,
+		triangle.color,
+		triangle.color
+	};
 }
 
 void Update(Scene &scene, Uint8 &light_selected) {
