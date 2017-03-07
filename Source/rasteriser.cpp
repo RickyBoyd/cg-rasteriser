@@ -312,7 +312,7 @@ void ShadeVertex(const Vertex& world_vertex, const Scene &scene, Pixel& p)
 		camera_vertex_to_light = glm::rotate(camera_vertex_to_light, glm::radians(scene.camera_.yaw), vec3(0.0f, 1.0f, 0.0f));
 		camera_vertex_to_light = glm::rotate(camera_vertex_to_light, glm::radians(scene.camera_.roll), vec3(0.0f, 0.0f, 1.0f));
 
-		 vec3 direct_light = light.color * std::max(glm::dot(glm::normalize(camera_vertex_to_light), glm::normalize(camera_vertex_normal)), 0.0f) / float(4.0f * M_PI * glm::dot(camera_vertex_to_light, camera_vertex_to_light));
+		 vec3 direct_light = light.color * std::max(abs(glm::dot(glm::normalize(camera_vertex_to_light), glm::normalize(camera_vertex_normal))), 0.0f) / float(4.0f * M_PI * glm::dot(camera_vertex_to_light, camera_vertex_to_light));
 		 p.illumination += direct_light * world_vertex.diffuse_reflectance + scene.indirect_light_ * world_vertex.indirect_reflectance;
 	}
 }
