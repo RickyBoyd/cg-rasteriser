@@ -1,5 +1,6 @@
 #pragma once
 #include <glm/detail/type_vec3.hpp>
+#include <glm/detail/type_vec4.hpp>
 #include "Camera.h"
 #include <glm/detail/func_trigonometric.hpp>
 #include <glm/gtx/rotate_vector.hpp>
@@ -13,11 +14,9 @@ struct Light {
 
 	void UpdateCameraSpacePosition(const Camera& camera)
 	{
-		glm::vec3 camera_space_position = position - camera.position;
-		camera_space_position = glm::rotate(camera_space_position, glm::radians(camera.pitch), glm::vec3(1.0f, 0.0f, 0.0f));
-		camera_space_position = glm::rotate(camera_space_position, glm::radians(camera.yaw), glm::vec3(0.0f, 1.0f, 0.0f));
-		camera_space_position = glm::rotate(camera_space_position, glm::radians(camera.roll), glm::vec3(0.0f, 0.0f, 1.0f));
-		camera_position = camera_space_position;
+		glm::vec4 light_pos = glm::vec4(position, 1.0f);
+		light_pos =  camera.worldToCamera * light_pos;
+		camera_position = glm::vec3(light_pos);
 	}
 };
 
