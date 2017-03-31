@@ -42,11 +42,10 @@ const int SCREEN_HEIGHT = 500;
 //const glm::vec2 JITTER_MATRIX[AA_SAMPLES] = { glm::vec2(-0.25, 0.75), glm::vec2(0.75, 0.25), glm::vec2(-0.75, -0.25), glm::vec2(0.25, -0.75) };
 SDL_Surface *screen;
 int t;
-const float FOCAL_LENGTH = SCREEN_WIDTH / 2;
 
 //Pipeline
 void WorldToCameraSpace(std::vector<Triangle> &world_tris, Scene& scene, std::vector<Triangle> &camera_tris );
-void Perspective(std::vector<Triangle> &triangles, glm::mat4 perspectiveProjection);
+void Perspective(std::vector<Triangle> &triangles, glm::mat4 perspectiveProjection, Scene &scene);
 void Clip(std::vector<Triangle> &triangles, std::vector<Triangle> &clipped);
 void PerspectiveDivideTriangles(std::vector<Triangle> &triangles);
 void PerspectiveDivideVertex(glm::vec4 &vertex);
