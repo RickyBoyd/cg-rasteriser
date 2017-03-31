@@ -16,6 +16,8 @@
 
 #define EDGE_AA
 
+#define W_CLIPPING_PLANE 0.00001 
+
 #if defined _WIN32 || defined _WIN64
 extern "C" {
 	FILE __iob_func[3] = { stdin, stdout,*stderr };
@@ -44,8 +46,18 @@ const float FOCAL_LENGTH = SCREEN_WIDTH / 2;
 
 //Pipeline
 void WorldToCameraSpace(std::vector<Triangle> &world_tris, Scene& scene, std::vector<Triangle> &camera_tris );
+void Perspective(std::vector<Triangle> &triangles, glm::mat4 perspectiveProjection);
+void Clip(std::vector<Triangle> &triangles, std::vector<Triangle> &clipped);
+void PerspectiveDivideTriangles(std::vector<Triangle> &triangles);
+void PerspectiveDivideVertex(glm::vec4 &vertex);
 void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer);
 void Update(Scene &scene, Uint8 &light_selected);
+
+//Clipping functions
+void ClipTriangle(Triangle &triangle, std::vector<Triangle> &out_triangles);
+void ClipPolygonOnWAxis(Triangle &triangle, std::vector<glm::vec4> &out);
+void ClipPolygonForAxis(Triangle &triangle, int AXIS, std::vector<glm::vec4> &out);
+void PolygonToTriangles(std::vector<glm::vec4> &vertices, glm::vec3 color, float transparency, float refractive_index, std::vector<Triangle> &triangles);
 
 //Drawing functions
 void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line);
@@ -122,8 +134,17 @@ int main(int argc, char *argv[]) {
 	std::vector<float> depth_buffer;
 	depth_buffer.resize(SCREEN_WIDTH * SCREEN_HEIGHT);
 
+	glm::mat4 perspective =  glm::perspective((float)M_PI/2.0f, (float)SCREEN_WIDTH/(float)SCREEN_HEIGHT, scene.camera_.focal_length, 100.0f );
+
+	//glm::mat4 perspective(1.0f);
+
+	//perspective = glm::translate(perspective, glm::vec3(0.0f, 0.0f, 1.0f));
+
 	while (NoQuitMessageSDL()) {
 		WorldToCameraSpace(world_tris, scene, camera_tris );
+		Perspective(camera_tris, perspective, scene);
+		//Clip(triangles, visible);
+		PerspectiveDivideTriangles(camera_tris);
 		Draw(scene, camera_tris, depth_buffer);
 		Update(scene, light_selected);
 	}
@@ -153,6 +174,213 @@ void WorldToCameraSpace(std::vector<Triangle> &world_tris, Scene& scene, std::ve
      	camera_tris[i] = camera_triangle;
 	}
 }
+
+
+void Perspective(std::vector<Triangle> &triangles, glm::mat4 perspectiveProjection, Scene &scene)
+{
+	for(int i = 0; i < triangles.size(); i++)
+	{
+		// triangles[i].v0_ = triangles[i].v0_ * perspectiveProjection; 
+		// triangles[i].v1_ = triangles[i].v1_ * perspectiveProjection; 
+		// triangles[i].v2_ = triangles[i].v2_ * perspectiveProjection; 
+		triangles[i].v0_ = glm::vec4(triangles[i].v0_.x, triangles[i].v0_.y, triangles[i].v0_.z, triangles[i].v0_.z / scene.camera_.focal_length);
+		triangles[i].v1_ = glm::vec4(triangles[i].v0_.x, triangles[i].v0_.y, triangles[i].v0_.z, triangles[i].v1_.z / scene.camera_.focal_length);; 
+		triangles[i].v2_ = glm::vec4(triangles[i].v0_.x, triangles[i].v0_.y, triangles[i].v0_.z, triangles[i].v2_.z / scene.camera_.focal_length);; 
+	}
+}
+
+void Clip(std::vector<Triangle> &triangles, std::vector<Triangle> &clipped)
+{
+	for(Triangle triangle : triangles)
+	{
+		std::vector<Triangle> clipped_triangle;
+		ClipTriangle(triangle, clipped_triangle);
+		clipped.insert(std::end(clipped), std::begin(clipped_triangle), std::end(clipped_triangle));
+	}
+}
+
+void ClipTriangle(Triangle &triangle, std::vector<Triangle> &out_triangles)
+{
+	std::vector<glm::vec4> clipped_vertices;
+	ClipPolygonOnWAxis(triangle, clipped_vertices);
+	ClipPolygonForAxis(triangle, 0, clipped_vertices);
+	ClipPolygonForAxis(triangle, 1, clipped_vertices);
+	ClipPolygonForAxis(triangle, 2, clipped_vertices);
+	PolygonToTriangles(clipped_vertices, triangle.color, triangle.transparency_, triangle.refractive_index_, out_triangles);
+}
+
+
+void ClipPolygonOnWAxis(Triangle &triangle, std::vector<glm::vec4> &out)
+{
+    char previousInside;
+    char currentInside;
+	
+    float a;
+    glm::vec4 intersectionPoint; 
+
+    std::vector<glm::vec4> vertices = triangle.Vertices();
+
+    glm::vec4 currentVertex;  
+    glm::vec4 previousVertex = vertices.back();
+
+    previousInside = previousVertex.w < W_CLIPPING_PLANE ? -1 : 1;
+
+    for(int i = 0; i < vertices.size(); i++ )
+    {
+    	currentVertex = vertices[i];
+    	
+        currentInside  =  currentVertex.w <= W_CLIPPING_PLANE ? -1 : 1;
+
+        if (previousInside * currentInside < 0) // One end in and one out since -1 * 1 = -1
+    	{
+        	//Need to clip against plane w=0
+			
+        	a = (W_CLIPPING_PLANE - previousVertex.w ) / (previousVertex.w - currentVertex.w);
+			
+        	// I = Qp + f(Qc-Qp))
+        	glm::vec4 intersectionPoint(currentVertex);         
+        	intersectionPoint = previousVertex - intersectionPoint;    
+        	intersectionPoint = a * intersectionPoint;                  
+        	intersectionPoint = previousVertex + intersectionPoint;     
+			
+        	// Insert
+        	out.push_back(glm::vec4(intersectionPoint)); 
+    	}
+		
+    	if (currentInside > 0) //if current vertex inside 
+    	{
+        	//Insert
+        	out.push_back(glm::vec4(currentVertex)); //NEED TO COPY
+    	}
+		
+    	previousInside = currentInside;
+		previousVertex = currentVertex;
+    }
+}
+
+void ClipPolygonForAxis(Triangle &triangle, int AXIS, std::vector<glm::vec4> &out)
+{
+    glm::vec4 currentVertex;
+    glm::vec4 previousVertex;
+	
+    std::vector<glm::vec4> clipped;
+	
+    char previousInside;
+    char currentInside;
+	
+    float a;
+    glm::vec4 intersectionPoint;
+
+    std::vector<glm::vec4> vertices = triangle.Vertices();
+
+    //Clip against first plane
+    previousVertex = vertices.back();
+    previousInside = previousVertex[AXIS] <= previousVertex.w ? 1 : -1;
+    currentVertex = vertices[0];
+    for ( int i = 0; i < vertices.size(); i++ ) 
+    {
+    	currentVertex = vertices[i];
+        currentInside = currentVertex[AXIS] <= currentVertex.w ? 1 : -1;
+    			
+        if (previousInside * currentInside < 0)
+        {
+            // Intersection point P can be written as a combination of both the points
+            // P = (1-a)*P1 + a *P2
+
+            //and a = (w1 + x1) / ( (w1 + x1) - (w2 + x2) )
+
+			// http://fabiensanglard.net/polygon_codec/clippingdocument/p245-blinn.pdf
+
+            a = (previousVertex.w - previousVertex[AXIS]) / 
+                ((previousVertex.w - previousVertex[AXIS]) - (currentVertex.w - currentVertex[AXIS] ));
+			
+            glm::vec4 intersectionPoint(currentVertex);
+            intersectionPoint = previousVertex - intersectionPoint;
+            intersectionPoint = a * intersectionPoint;
+            intersectionPoint = previousVertex + intersectionPoint;
+			
+            // Insert
+            clipped.push_back(glm::vec4(intersectionPoint));
+        }
+		
+        if (currentInside > 0)
+        {
+            //Insert
+            clipped.push_back(glm::vec4(currentVertex));
+        }
+		
+        previousInside = currentInside;
+        //Move forward
+        previousVertex = currentVertex;
+    }
+
+    //Clip against opposite plane
+    previousVertex = clipped.back();
+    previousInside = previousVertex[AXIS] <= previousVertex.w ? 1 : -1;
+    currentVertex = clipped[0];
+    for ( int i = 0; i < clipped.size(); i++ ) 
+    {
+    	currentVertex = clipped[i];
+        currentInside = currentVertex[AXIS] <= currentVertex.w ? 1 : -1;
+		
+        if (previousInside * currentInside < 0)
+        {
+            //Need to clip against plan w=0
+			
+            a = (previousVertex.w + previousVertex[AXIS]) / 
+                ( (previousVertex.w + previousVertex[AXIS]) - (currentVertex.w + currentVertex[AXIS]) );
+			
+			glm::vec4 intersectionPoint(currentVertex);
+			intersectionPoint = previousVertex - intersectionPoint;
+			intersectionPoint = a * intersectionPoint;
+			intersectionPoint = previousVertex + intersectionPoint;
+			
+            out.push_back(glm::vec4(intersectionPoint));
+        }
+		
+        if (currentInside > 0)
+        {
+			out.push_back(glm::vec4(currentVertex));
+        }
+		
+        previousInside = currentInside;
+		
+        //Move forward
+        previousVertex = currentVertex;
+    }        
+}
+
+void PolygonToTriangles(std::vector<glm::vec4> &vertices, glm::vec3 color, float transparency, float refractive_index, std::vector<Triangle> &triangles)
+{
+	//converts a polygon with n sides to n-2 triangles
+
+	glm::vec4 third_point = glm::vec4(vertices[vertices.size()-2]);
+
+	for(int i = 0; i < (vertices.size() - 2); i++)
+	{
+		glm::vec4 v0 = vertices[i];
+		glm::vec4 v1 = vertices[1+1];
+		glm::vec4 v2(third_point);
+		triangles.push_back(Triangle(v0, v1, v2, color, transparency, refractive_index));
+	}
+}
+
+
+void PerspectiveDivideTriangles(std::vector<Triangle> &triangles)
+{
+	for(int i = 0; i < triangles.size(); i++)
+	{
+		// PerspectiveDivideVertex(triangles[i].v0_);
+		// PerspectiveDivideVertex(triangles[i].v1_);
+		// PerspectiveDivideVertex(triangles[i].v2_);
+		triangles[i].v0_ = triangles[i].v0_ / triangles[i].v0_.w;
+		triangles[i].v1_ = triangles[i].v1_ / triangles[i].v1_.w;
+		triangles[i].v2_ = triangles[i].v2_ / triangles[i].v2_.w;
+
+		triangles[i].ComputeNormal();
+	}
+}
+
 
 void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer)
 {
@@ -310,26 +538,15 @@ void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth
 	}
 }
 
-Pixel VertexToPixel(const glm::vec3 camera_vertex_position, const Triangle& triangle, const Scene &scene)
+Pixel VertexToPixel(const glm::vec3 vertex_position, const Triangle& triangle, const Scene &scene)
 {
-	// vec3 camera_vertex_normal = triangle.normal;
-	// camera_vertex_normal = glm::rotate(camera_vertex_normal, glm::radians(scene.camera_.pitch), vec3(1.0f, 0.0f, 0.0f));
-	// camera_vertex_normal = glm::rotate(camera_vertex_normal, glm::radians(scene.camera_.yaw), vec3(0.0f, 1.0f, 0.0f));
-	// camera_vertex_normal = glm::rotate(camera_vertex_normal, glm::radians(scene.camera_.roll), vec3(0.0f, 0.0f, 1.0f));
-
-	// // Convert the world-space vertex into a camera-space vertex
-	// // TODO: cache all these computations
-	// vec3 camera_vertex_position = world_vertex - scene.camera_.position;
-	// camera_vertex_position = glm::rotate(camera_vertex_position, glm::radians(scene.camera_.pitch), vec3(1.0f, 0.0f, 0.0f));
-	// camera_vertex_position = glm::rotate(camera_vertex_position, glm::radians(scene.camera_.yaw), vec3(0.0f, 1.0f, 0.0f));
-	// camera_vertex_position = glm::rotate(camera_vertex_position, glm::radians(scene.camera_.roll), vec3(0.0f, 0.0f, 1.0f));
-
 	return Pixel{
-		glm::ivec2(
-			SCREEN_WIDTH * (scene.camera_.focal_length * camera_vertex_position.x / camera_vertex_position.z + 1.0f / 2.0f),
-			SCREEN_HEIGHT * (-scene.camera_.focal_length * camera_vertex_position.y / camera_vertex_position.z + 1.0f / 2.0f)),
-		camera_vertex_position.z == 0.0f ? std::numeric_limits<float>::max() : 1.0f / camera_vertex_position.z,
-		camera_vertex_position,
+		glm::ivec2( //std::min((uint32_t)SCREEN_WIDTH - 1, (uint32_t)((vertex_position.x + 1) * 0.5 * SCREEN_WIDTH)),
+			//std::min((uint32_t)SCREEN_HEIGHT - 1, (uint32_t)((1 - (vertex_position.y + 1) * 0.5) * SCREEN_HEIGHT)) ),
+			SCREEN_WIDTH * ( vertex_position.x  + 1.0f / 2.0f),
+			SCREEN_HEIGHT * (-1.0f * vertex_position.y + 1.0f / 2.0f)),
+		vertex_position.z == 0.0f ? std::numeric_limits<float>::max() : 1.0f / vertex_position.z,
+		vertex_position,
 		triangle.normal,
 		triangle.color,
 		triangle.color
@@ -359,12 +576,12 @@ void Update(Scene &scene, Uint8 &light_selected) {
 	if (keystate[SDLK_RIGHT]) {
 		scene.camera_.Translate(glm::vec3(dt * movement_speed, 0.0f, 0.0f ));
 	}
-	// if (keystate[SDLK_w]) {
-	// 	scene.lights_[light_selected].position += vec3(0.0f, 0.0f, movement_speed * dt);
-	// }
-	// if (keystate[SDLK_s]) {
-	// 	scene.lights_[light_selected].position += vec3(0.0f, 0.0f, -movement_speed * dt);
-	// }
+	if (keystate[SDLK_w]) {
+		scene.camera_.Translate(glm::vec3(0.0f , 0.0f,  dt * movement_speed));
+	}
+	if (keystate[SDLK_s]) {
+		scene.camera_.Translate(glm::vec3(0.0f, 0.0f, -1.0f * dt * movement_speed ));
+	}
 	// if (keystate[SDLK_a]) {
 	// 	scene.lights_[light_selected].position += vec3(-movement_speed * dt, 0.0f, 0.0f);
 	// }

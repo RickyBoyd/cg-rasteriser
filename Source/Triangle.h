@@ -2,7 +2,7 @@
 
 #include <glm/glm.hpp>
 #include <iostream>
-
+#include <vector>
 
 class Triangle
 {
@@ -26,4 +26,6 @@ public:
 	Triangle(void);
 
 	void ComputeNormal();
+
+	std::vector<glm::vec4> Vertices();
 };

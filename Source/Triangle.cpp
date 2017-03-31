@@ -34,3 +34,12 @@ void Triangle::ComputeNormal()
 	glm::vec3 e2 = glm::vec3(v2_) - glm::vec3(v0_);
 	normal = glm::normalize(glm::cross(e2, e1));
 }
+
+std::vector<glm::vec4> Triangle::Vertices()
+{
+	std::vector<glm::vec4> vertices;
+	vertices.push_back(v0_);
+	vertices.push_back(v1_);
+	vertices.push_back(v2_);
+	return vertices;
+}
