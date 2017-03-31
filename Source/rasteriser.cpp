@@ -179,12 +179,12 @@ void Perspective(std::vector<Triangle> &triangles, glm::mat4 perspectiveProjecti
 {
 	for(int i = 0; i < triangles.size(); i++)
 	{
-		// triangles[i].v0_ = triangles[i].v0_ * perspectiveProjection; 
-		// triangles[i].v1_ = triangles[i].v1_ * perspectiveProjection; 
-		// triangles[i].v2_ = triangles[i].v2_ * perspectiveProjection; 
-		triangles[i].v0_ = glm::vec4(triangles[i].v0_.x, triangles[i].v0_.y, triangles[i].v0_.z, triangles[i].v0_.z / scene.camera_.focal_length);
-		triangles[i].v1_ = glm::vec4(triangles[i].v0_.x, triangles[i].v0_.y, triangles[i].v0_.z, triangles[i].v1_.z / scene.camera_.focal_length);; 
-		triangles[i].v2_ = glm::vec4(triangles[i].v0_.x, triangles[i].v0_.y, triangles[i].v0_.z, triangles[i].v2_.z / scene.camera_.focal_length);; 
+		triangles[i].v0_ = triangles[i].v0_ * perspectiveProjection; 
+		triangles[i].v1_ = triangles[i].v1_ * perspectiveProjection; 
+		triangles[i].v2_ = triangles[i].v2_ * perspectiveProjection; 
+		//triangles[i].v0_ = glm::vec4(triangles[i].v0_.x, triangles[i].v0_.y, triangles[i].v0_.z, triangles[i].v0_.z / scene.camera_.focal_length);
+		//triangles[i].v1_ = glm::vec4(triangles[i].v0_.x, triangles[i].v0_.y, triangles[i].v0_.z, triangles[i].v1_.z / scene.camera_.focal_length);; 
+		//triangles[i].v2_ = glm::vec4(triangles[i].v0_.x, triangles[i].v0_.y, triangles[i].v0_.z, triangles[i].v2_.z / scene.camera_.focal_length);; 
 	}
 }
 
@@ -543,7 +543,7 @@ Pixel VertexToPixel(const glm::vec3 vertex_position, const Triangle& triangle, c
 		glm::ivec2( //std::min((uint32_t)SCREEN_WIDTH - 1, (uint32_t)((vertex_position.x + 1) * 0.5 * SCREEN_WIDTH)),
 			//std::min((uint32_t)SCREEN_HEIGHT - 1, (uint32_t)((1 - (vertex_position.y + 1) * 0.5) * SCREEN_HEIGHT)) ),
 			SCREEN_WIDTH * ( vertex_position.x  + 1.0f / 2.0f),
-			SCREEN_HEIGHT * (-1.0f * vertex_position.y + 1.0f / 2.0f)),
+			SCREEN_HEIGHT * ( vertex_position.y + 1.0f / 2.0f)),
 		vertex_position.z == 0.0f ? std::numeric_limits<float>::max() : 1.0f / vertex_position.z,
 		vertex_position,
 		triangle.normal,
