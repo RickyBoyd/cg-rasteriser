@@ -16,6 +16,7 @@ struct Pixel
 	glm::vec3 camera_normal; // normal in camera coordinate system
 	glm::vec3 diffuse_reflectance;
 	glm::vec3 indirect_reflectance;
+	glm::vec3 world_pos;
 };
 
 void Interpolate(const Pixel a, const Pixel b, std::vector<Pixel>& result);

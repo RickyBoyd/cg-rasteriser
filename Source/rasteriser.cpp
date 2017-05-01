@@ -42,19 +42,21 @@ SDL_Surface *screen;
 int t;
 const float FOCAL_LENGTH = SCREEN_WIDTH / 2;
 
-//Pipeline
-void WorldToCameraSpace(std::vector<Triangle> &world_tris, Scene& scene, std::vector<Triangle> &camera_tris );
-void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer);
+void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer, std::vector<float>& shadow_map);
 void Update(Scene &scene, Uint8 &light_selected);
+
+void ComputeShadowMap(const std::vector<Triangle> &triangles, std::vector<float>& shadow_map);
+void DrawTriangleShadow(const Triangle& triangle, const Scene& scene, std::vector<float>& shadow_map);
+void DrawPixelShadow(const Pixel& pixel, const Scene& scene, std::vector<float>& shadow_map);
 
 //Drawing functions
 void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line);
-void DrawTriangle(const Triangle& triangle, const Scene& scene, std::vector<float>& depth_buffer);
+void DrawTriangle(const Triangle& triangle, const Scene& scene, glm::mat4& world, glm::mat4& projection, std::vector<float>& depth_buffer, std::vector<float>& shadow_map);
 void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pixel>& left_pixels, std::vector<Pixel>& right_pixels);
 void DrawTriangleEdges(const Triangle& triangle, const Scene &scene);
-void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const Scene& scene, std::vector<float>& depth_buffer);
-void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth_buffer);
-Pixel VertexToPixel(const glm::vec3 world_vertex, const Triangle& triangle, const Scene &scene);
+void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map);
+void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map);
+Pixel VertexToPixel(const glm::vec3 world_vertex, const Triangle& triangle, const Scene &scene, glm::mat4& world, glm::mat4& projection);
 
 int main(int argc, char *argv[]) {
 	screen = InitializeSDL(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -116,15 +118,14 @@ int main(int argc, char *argv[]) {
 	std::vector<Triangle> world_tris = scene.ToTriangles();
 	std::cout << "Loaded " << world_tris.size() << " tris" << std::endl;
 
-	std::vector<Triangle> camera_tris;
-	camera_tris.resize(world_tris.size());
-
 	std::vector<float> depth_buffer;
 	depth_buffer.resize(SCREEN_WIDTH * SCREEN_HEIGHT);
 
+	std::vector<float> shadow_map;
+	shadow_map.resize(SCREEN_WIDTH * SCREEN_HEIGHT);
+
 	while (NoQuitMessageSDL()) {
-		WorldToCameraSpace(world_tris, scene, camera_tris );
-		Draw(scene, camera_tris, depth_buffer);
+		Draw(scene, world_tris, depth_buffer, shadow_map);
 		Update(scene, light_selected);
 	}
 
@@ -136,25 +137,7 @@ int main(int argc, char *argv[]) {
 	return 0;
 }
 
-void WorldToCameraSpace(std::vector<Triangle> &world_tris, Scene& scene, std::vector<Triangle> &camera_tris )
-{
-	for (auto &light : scene.lights_)
-	{
-		light.UpdateCameraSpacePosition(scene.camera_);
-	}
- 	Triangle world_triangle;
-	for(int i = 0; i < world_tris.size() ; i++)
-	{
-     	world_triangle = world_tris[i];
-		glm::vec4 v0 = scene.camera_.worldToCamera * world_triangle.v0_ ;
-		glm::vec4 v1 = scene.camera_.worldToCamera * world_triangle.v1_;
-		glm::vec4 v2 = scene.camera_.worldToCamera * world_triangle.v2_;
-		Triangle camera_triangle(v0, v1, v2, world_triangle.color, world_triangle.transparency_, world_triangle.refractive_index_);
-     	camera_tris[i] = camera_triangle;
-	}
-}
-
-void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer)
+void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer, std::vector<float>& shadow_map)
 {
 	SDL_FillRect(screen, 0, 0);
 	if (SDL_MUSTLOCK(screen))
@@ -164,6 +147,7 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<floa
 	{
 		light.UpdateCameraSpacePosition(scene.camera_);
 	}
+
 	for(int y = 0; y < SCREEN_HEIGHT; y++)
 	{
 		for(int x = 0; x < SCREEN_WIDTH; x++)
@@ -172,15 +156,51 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<floa
 		}
 	}
 
+	for(int y = 0; y < SCREEN_HEIGHT; y++)
+	{
+		for(int x = 0; x < SCREEN_WIDTH; x++)
+		{
+			shadow_map[y * SCREEN_WIDTH + x] = 0;
+		}
+	}
+
+	glm::mat4 camera_projection = glm::perspective(90.0f, (float)SCREEN_WIDTH/(float)SCREEN_HEIGHT, 0.1f, 7.5f );
+
+	//glm::worldToLight;
+	//glm::mat4 light_projection = glm::ortho(2.0f, 2.0f, 0.1f, 10.0f );
+	
+
 	for (auto triangle : triangles)
 	{
-		DrawTriangle(triangle, scene, depth_buffer);
+		DrawTriangle(triangle, scene, scene.camera_.worldToCamera, camera_projection, depth_buffer, shadow_map);
 		//DrawTriangleEdges(triangle, scene);
 	}
 	if (SDL_MUSTLOCK(screen))
 		SDL_UnlockSurface(screen);
 	SDL_UpdateRect(screen, 0, 0, 0, 0);
 }
+
+// void ComputeShadowMap(const std::vector<Triangle> &triangles, std::vector<float>& shadow_map)
+// {
+// 	for (auto triangle : triangles)
+// 	{
+// 		DrawTriangleShadow(triangle, scene, shadow_map);
+// 	}
+// }
+
+// void DrawTriangleShadow(const Triangle& triangle, const Scene& scene, std::vector<float>& shadow_map)
+// {
+// 	std::vector<Pixel> vertex_pixels(3);
+// 	vertex_pixels[0] = VertexToPixel(glm::vec3(triangle.v0_), triangle, scene);
+// 	vertex_pixels[1] = VertexToPixel(glm::vec3(triangle.v1_), triangle, scene);
+// 	vertex_pixels[2] = VertexToPixel(glm::vec3(triangle.v2_), triangle, scene);
+
+// 	std::vector<Pixel> left_pixels;
+// 	std::vector<Pixel> right_pixels;
+// 	ComputePolygonRows(vertex_pixels, left_pixels, right_pixels);
+// 	DrawPolygonRowsShadow(left_pixels, right_pixels, scene, depth_buffer);
+// }
+
 
 void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line)
 {
@@ -191,17 +211,17 @@ void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line)
 	Interpolate(a, b, line);
 }
 
-void DrawTriangle(const Triangle& triangle, const Scene& scene, std::vector<float>& depth_buffer)
+void DrawTriangle(const Triangle& triangle, const Scene& scene, glm::mat4& world, glm::mat4& projection, std::vector<float>& depth_buffer, std::vector<float>& shadow_map)
 {
 	std::vector<Pixel> vertex_pixels(3);
-	vertex_pixels[0] = VertexToPixel(glm::vec3(triangle.v0_), triangle, scene);
-	vertex_pixels[1] = VertexToPixel(glm::vec3(triangle.v1_), triangle, scene);
-	vertex_pixels[2] = VertexToPixel(glm::vec3(triangle.v2_), triangle, scene);
+	vertex_pixels[0] = VertexToPixel(glm::vec3(triangle.v0_), triangle, scene, world, projection);
+	vertex_pixels[1] = VertexToPixel(glm::vec3(triangle.v1_), triangle, scene, world, projection);
+	vertex_pixels[2] = VertexToPixel(glm::vec3(triangle.v2_), triangle, scene, world, projection);
 
 	std::vector<Pixel> left_pixels;
 	std::vector<Pixel> right_pixels;
 	ComputePolygonRows(vertex_pixels, left_pixels, right_pixels);
-	DrawPolygonRows(left_pixels, right_pixels, scene, depth_buffer);
+	DrawPolygonRows(left_pixels, right_pixels, scene, depth_buffer, shadow_map);
 }
 
 void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pixel>& left_pixels, std::vector<Pixel>& right_pixels)
@@ -260,20 +280,20 @@ void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pix
 	}
 }
 
-void DrawTriangleEdges(const Triangle& triangle, const Scene &scene)
-{
-	// Transform each vertex from 3D world position to 2D image position
-	auto p0 = VertexToPixel(glm::vec3(triangle.v0_), triangle, scene);
-	auto p1 = VertexToPixel(glm::vec3(triangle.v1_), triangle, scene);
-	auto p2 = VertexToPixel(glm::vec3(triangle.v2_), triangle, scene);
+// void DrawTriangleEdges(const Triangle& triangle, const Scene &scene)
+// {
+// 	// Transform each vertex from 3D world position to 2D image position
+// 	auto p0 = VertexToPixel(glm::vec3(triangle.v0_), triangle, scene);
+// 	auto p1 = VertexToPixel(glm::vec3(triangle.v1_), triangle, scene);
+// 	auto p2 = VertexToPixel(glm::vec3(triangle.v2_), triangle, scene);
 
-	vec3 color(1, 1, 1);
-	DrawLineSDL(screen, p0.pos, p1.pos, color);
-	DrawLineSDL(screen, p1.pos, p2.pos, color);
-	DrawLineSDL(screen, p2.pos, p0.pos, color);
-}
+// 	vec3 color(1, 1, 1);
+// 	DrawLineSDL(screen, p0.pos, p1.pos, color);
+// 	DrawLineSDL(screen, p1.pos, p2.pos, color);
+// 	DrawLineSDL(screen, p2.pos, p0.pos, color);
+// }
 
-void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const Scene& scene, std::vector<float>& depth_buffer)
+void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map)
 {
 	for (int i = 0; i < left_pixels.size(); i++)
 	{
@@ -283,13 +303,13 @@ void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pi
 		{
 			if (pixel.pos.x >= 0 && pixel.pos.x < SCREEN_WIDTH && pixel.pos.y >= 0 && pixel.pos.y < SCREEN_HEIGHT)
 			{
-				DrawPixel(pixel, scene, depth_buffer);
+				DrawPixel(pixel, scene, depth_buffer, shadow_map);
 			}
 		}
 	}
 }
 
-void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth_buffer)
+void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map)
 {
 	if (pixel.z_inv > depth_buffer[pixel.pos.y * SCREEN_WIDTH + pixel.pos.x])
 	{
@@ -310,29 +330,24 @@ void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth
 	}
 }
 
-Pixel VertexToPixel(const glm::vec3 camera_vertex_position, const Triangle& triangle, const Scene &scene)
+Pixel VertexToPixel(const glm::vec3 world_pos, const Triangle& triangle, const Scene &scene, glm::mat4& world, glm::mat4& projection)
 {
-	// vec3 camera_vertex_normal = triangle.normal;
-	// camera_vertex_normal = glm::rotate(camera_vertex_normal, glm::radians(scene.camera_.pitch), vec3(1.0f, 0.0f, 0.0f));
-	// camera_vertex_normal = glm::rotate(camera_vertex_normal, glm::radians(scene.camera_.yaw), vec3(0.0f, 1.0f, 0.0f));
-	// camera_vertex_normal = glm::rotate(camera_vertex_normal, glm::radians(scene.camera_.roll), vec3(0.0f, 0.0f, 1.0f));
+	glm::vec4 camera_vertex_position = world * glm::vec4(world_pos, 1.0f);
 
-	// // Convert the world-space vertex into a camera-space vertex
-	// // TODO: cache all these computations
-	// vec3 camera_vertex_position = world_vertex - scene.camera_.position;
-	// camera_vertex_position = glm::rotate(camera_vertex_position, glm::radians(scene.camera_.pitch), vec3(1.0f, 0.0f, 0.0f));
-	// camera_vertex_position = glm::rotate(camera_vertex_position, glm::radians(scene.camera_.yaw), vec3(0.0f, 1.0f, 0.0f));
-	// camera_vertex_position = glm::rotate(camera_vertex_position, glm::radians(scene.camera_.roll), vec3(0.0f, 0.0f, 1.0f));
+	glm::vec4 projected = projection * camera_vertex_position;
+	//Clip here
+	glm::vec3 screen = glm::vec3(projected/projected.w);
 
 	return Pixel{
 		glm::ivec2(
-			SCREEN_WIDTH * (scene.camera_.focal_length * camera_vertex_position.x / camera_vertex_position.z + 1.0f / 2.0f),
-			SCREEN_HEIGHT * (-scene.camera_.focal_length * camera_vertex_position.y / camera_vertex_position.z + 1.0f / 2.0f)),
+			SCREEN_WIDTH * ( screen.x  + 1.0f) / 2.0f,
+			SCREEN_HEIGHT * ( screen.y +  1.0f) / 2.0f),
 		camera_vertex_position.z == 0.0f ? std::numeric_limits<float>::max() : 1.0f / camera_vertex_position.z,
-		camera_vertex_position,
+		glm::vec3(camera_vertex_position),
 		triangle.normal,
 		triangle.color,
-		triangle.color
+		triangle.color,
+		world_pos
 	};
 }
 
@@ -348,10 +363,10 @@ void Update(Scene &scene, Uint8 &light_selected) {
 
 	auto keystate = SDL_GetKeyState(nullptr);
 	if (keystate[SDLK_UP]) {
-		scene.camera_.Translate(glm::vec3(0.0f,dt * movement_speed, 0.0f ));
+		scene.camera_.Translate(glm::vec3(0.0f, -dt * movement_speed, 0.0f ));
 	}
 	if (keystate[SDLK_DOWN]) {
-		scene.camera_.Translate(glm::vec3(0.0f, -1.0f * dt * movement_speed, 0.0f ));
+		scene.camera_.Translate(glm::vec3(0.0f,  dt * movement_speed, 0.0f ));
 	}
 	if (keystate[SDLK_LEFT]) {
 		scene.camera_.Translate(glm::vec3(-1.0f * dt * movement_speed, 0.0f, 0.0f ));
@@ -359,24 +374,32 @@ void Update(Scene &scene, Uint8 &light_selected) {
 	if (keystate[SDLK_RIGHT]) {
 		scene.camera_.Translate(glm::vec3(dt * movement_speed, 0.0f, 0.0f ));
 	}
-	// if (keystate[SDLK_w]) {
-	// 	scene.lights_[light_selected].position += vec3(0.0f, 0.0f, movement_speed * dt);
-	// }
-	// if (keystate[SDLK_s]) {
-	// 	scene.lights_[light_selected].position += vec3(0.0f, 0.0f, -movement_speed * dt);
-	// }
-	// if (keystate[SDLK_a]) {
-	// 	scene.lights_[light_selected].position += vec3(-movement_speed * dt, 0.0f, 0.0f);
-	// }
-	// if (keystate[SDLK_d]) {
-	// 	scene.lights_[light_selected].position += vec3(movement_speed * dt, 0.0f, 0.0f);
-	// }
-	// if (keystate[SDLK_q]) {
-	// 	scene.lights_[light_selected].position += vec3(0.0f, movement_speed * dt, 0.0f);
-	// }
-	// if (keystate[SDLK_e]) {
-	// 	scene.lights_[light_selected].position += vec3(0.0f, -movement_speed * dt, 0.0f);
-	// }
+	if (keystate[SDLK_LSHIFT]) {
+		scene.camera_.Translate(glm::vec3(0.0f, 0.0f, -dt * movement_speed));
+	}
+	if (keystate[SDLK_SPACE]) {
+		scene.camera_.Translate(glm::vec3(0.0f, 0.0f, dt * movement_speed));
+	}
+
+
+	if (keystate[SDLK_w]) {
+		scene.lights_[light_selected].position += vec3(0.0f, 0.0f, movement_speed * dt);
+	}
+	if (keystate[SDLK_s]) {
+		scene.lights_[light_selected].position += vec3(0.0f, 0.0f, -movement_speed * dt);
+	}
+	if (keystate[SDLK_a]) {
+		scene.lights_[light_selected].position += vec3(movement_speed * dt, 0.0f, 0.0f);
+	}
+	if (keystate[SDLK_d]) {
+		scene.lights_[light_selected].position += vec3(-movement_speed * dt, 0.0f, 0.0f);
+	}
+	if (keystate[SDLK_q]) {
+		scene.lights_[light_selected].position += vec3(0.0f, movement_speed * dt, 0.0f);
+	}
+	if (keystate[SDLK_e]) {
+		scene.lights_[light_selected].position += vec3(0.0f, -movement_speed * dt, 0.0f);
+	}
 	// if (keystate[SDLK_n]) {
 	// 	if (scene.lights_.size() < 6) {
 	// 		//AddLight(vec3(0.0f, 0.0f, 0.0f), 10.0f * vec3(1.0f, 1.0f, 1.0f), scene.lights_);
