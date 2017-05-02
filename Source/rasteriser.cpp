@@ -351,7 +351,10 @@ void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth
 	{
 		depth_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x] = pixel.z_inv;
 
-		auto illumination = glm::vec3(0.0f);
+		//auto illumination = glm::vec3(0.0f);
+		frame_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x].x = 0;
+		frame_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x].y = 0;
+		frame_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x].z = 0;
 		for (auto light : scene.lights_)
 		{
 			// Compute the camera-space vector between the 3d position of the pixel and the light source
@@ -359,10 +362,9 @@ void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth
 			vec3 camera_pixel_to_light = light.camera_position - pixel.camera_pos;
 
 			vec3 direct_light = light.color * std::max(abs(glm::dot(glm::normalize(camera_pixel_to_light), glm::normalize(pixel.camera_normal))), 0.0f) / float(4.0f * M_PI * glm::dot(camera_pixel_to_light, camera_pixel_to_light));
-			illumination += direct_light * pixel.diffuse_reflectance + scene.indirect_light_ * pixel.indirect_reflectance;
+			frame_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x] += direct_light * pixel.diffuse_reflectance + scene.indirect_light_ * pixel.indirect_reflectance;
 		}
-		frame_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x] = illumination;
-		//PutPixelSDL(screen, pixel.pos.x, pixel.pos.y, illumination);
+		//frame_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x] = illumination;
 	}
 }
 
