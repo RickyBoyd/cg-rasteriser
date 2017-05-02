@@ -41,21 +41,23 @@ const int SCREEN_HEIGHT = 500;
 SDL_Surface *screen;
 int t;
 const float FOCAL_LENGTH = SCREEN_WIDTH / 2;
-
+Triangle useLessTri;
 void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer, std::vector<float>& shadow_map);
 void Update(Scene &scene, Uint8 &light_selected);
 
-void ComputeShadowMap(const std::vector<Triangle> &triangles, std::vector<float>& shadow_map);
-void DrawTriangleShadow(const Triangle& triangle, const Scene& scene, std::vector<float>& shadow_map);
+void ComputeShadowMap(const std::vector<Triangle> &triangles, const Scene& scene, glm::mat4& worldToLight, glm::mat4& lightProjection, std::vector<float>& shadow_map);
+void DrawTriangleShadow(const Triangle& triangle, const Scene& scene, glm::mat4& worldToLight, glm::mat4& lightProjection, std::vector<float>& shadow_map);
+void DrawPolygonRowsShadow(std::vector<Pixel>& left_pixels, std::vector<Pixel>& right_pixels, const Scene& scene, std::vector<float>& shadow_map);
 void DrawPixelShadow(const Pixel& pixel, const Scene& scene, std::vector<float>& shadow_map);
+float InShadow(glm::vec3 world_pos, const Scene& scene, glm::mat4& worldToLight, glm::mat4& lightProjection, std::vector<float>& shadow_map);
 
 //Drawing functions
 void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line);
-void DrawTriangle(const Triangle& triangle, const Scene& scene, glm::mat4& world, glm::mat4& projection, std::vector<float>& depth_buffer, std::vector<float>& shadow_map);
+void DrawTriangle(const Triangle& triangle, const Scene& scene, glm::mat4& world, glm::mat4& projection, glm::mat4& worldToLight, glm::mat4& lightProjection, std::vector<float>& depth_buffer, std::vector<float>& shadow_map);
 void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pixel>& left_pixels, std::vector<Pixel>& right_pixels);
 void DrawTriangleEdges(const Triangle& triangle, const Scene &scene);
-void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map);
-void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map);
+void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const Scene& scene, glm::mat4& worldToLight, glm::mat4& lightProjection, std::vector<float>& depth_buffer, std::vector<float>& shadow_map);
+void DrawPixel(const Pixel& pixel, const Scene& scene, glm::mat4& worldToLight, glm::mat4& lightProjection, std::vector<float>& depth_buffer, std::vector<float>& shadow_map);
 Pixel VertexToPixel(const glm::vec3 world_vertex, const Triangle& triangle, const Scene &scene, glm::mat4& world, glm::mat4& projection);
 
 int main(int argc, char *argv[]) {
@@ -72,7 +74,7 @@ int main(int argc, char *argv[]) {
 
 	auto cornell_box_scene = Scene(
 		std::vector<ModelInstance> { ModelInstance(Model("Resources/cornell_box.obj")) },
-		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
+		std::vector<Light> { Light{ vec3(0.0f, 0.0f, -2.0f), 15.0f * vec3(1,1,1) } },
 		0.2f * glm::vec3(1.0f, 1.0f, 1.0f),
 		Camera( glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f, 0.4f ));
 
@@ -166,41 +168,80 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<floa
 
 	glm::mat4 camera_projection = glm::perspective(90.0f, (float)SCREEN_WIDTH/(float)SCREEN_HEIGHT, 0.1f, 7.5f );
 
-	//glm::worldToLight;
-	//glm::mat4 light_projection = glm::ortho(2.0f, 2.0f, 0.1f, 10.0f );
+	glm::mat4 worldToLight = lookAt (scene.lights_[0].position, scene.lights_[0].position + glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	glm::mat4 lightProjection = glm::ortho(-3.0f, 3.0f, -3.0f, 3.0f, 0.1f, 100.0f );
 	
+	ComputeShadowMap(triangles, scene, worldToLight, camera_projection, shadow_map);
 
 	for (auto triangle : triangles)
 	{
-		DrawTriangle(triangle, scene, scene.camera_.worldToCamera, camera_projection, depth_buffer, shadow_map);
+		DrawTriangle(triangle, scene, scene.camera_.worldToCamera, camera_projection, worldToLight, lightProjection, depth_buffer, shadow_map);
 		//DrawTriangleEdges(triangle, scene);
 	}
+
+	// for(int y = 0; y < SCREEN_HEIGHT; y++)
+	// {
+	// 	for(int x = 0; x < SCREEN_WIDTH; x++)
+	// 	{
+	// 		if(shadow_map[y * SCREEN_WIDTH + x] != 0.0f)
+	// 		{
+	// 			std::cout << "(" << x << ", " << y << "): ";
+	// 			std::cout << shadow_map[y * SCREEN_WIDTH + x] << std::endl;
+	// 		}
+			
+	// 		PutPixelSDL(screen, x, y, glm::vec3(1.0f / shadow_map[y * SCREEN_WIDTH + x], 1.0f /  shadow_map[y * SCREEN_WIDTH + x], 1.0f /  shadow_map[y * SCREEN_WIDTH + x]) ) ;
+	// 	}
+	// }
+
 	if (SDL_MUSTLOCK(screen))
 		SDL_UnlockSurface(screen);
 	SDL_UpdateRect(screen, 0, 0, 0, 0);
 }
 
-// void ComputeShadowMap(const std::vector<Triangle> &triangles, std::vector<float>& shadow_map)
-// {
-// 	for (auto triangle : triangles)
-// 	{
-// 		DrawTriangleShadow(triangle, scene, shadow_map);
-// 	}
-// }
+void ComputeShadowMap(const std::vector<Triangle> &triangles, const Scene& scene, glm::mat4& worldToLight, glm::mat4& lightProjection, std::vector<float>& shadow_map)
+{
+	for (auto triangle : triangles)
+	{
+		DrawTriangleShadow(triangle, scene, worldToLight, lightProjection, shadow_map);
+	}
+}
 
-// void DrawTriangleShadow(const Triangle& triangle, const Scene& scene, std::vector<float>& shadow_map)
-// {
-// 	std::vector<Pixel> vertex_pixels(3);
-// 	vertex_pixels[0] = VertexToPixel(glm::vec3(triangle.v0_), triangle, scene);
-// 	vertex_pixels[1] = VertexToPixel(glm::vec3(triangle.v1_), triangle, scene);
-// 	vertex_pixels[2] = VertexToPixel(glm::vec3(triangle.v2_), triangle, scene);
+void DrawTriangleShadow(const Triangle& triangle, const Scene& scene, glm::mat4& worldToLight, glm::mat4& lightProjection, std::vector<float>& shadow_map)
+{
+	std::vector<Pixel> vertex_pixels(3);
+	vertex_pixels[0] = VertexToPixel(glm::vec3(triangle.v0_), triangle, scene, worldToLight, lightProjection);
+	vertex_pixels[1] = VertexToPixel(glm::vec3(triangle.v1_), triangle, scene, worldToLight, lightProjection);
+	vertex_pixels[2] = VertexToPixel(glm::vec3(triangle.v2_), triangle, scene, worldToLight, lightProjection);
 
-// 	std::vector<Pixel> left_pixels;
-// 	std::vector<Pixel> right_pixels;
-// 	ComputePolygonRows(vertex_pixels, left_pixels, right_pixels);
-// 	DrawPolygonRowsShadow(left_pixels, right_pixels, scene, depth_buffer);
-// }
+	std::vector<Pixel> left_pixels;
+	std::vector<Pixel> right_pixels;
+	ComputePolygonRows(vertex_pixels, left_pixels, right_pixels);
+	DrawPolygonRowsShadow(left_pixels, right_pixels, scene, shadow_map);
+}
 
+void DrawPolygonRowsShadow(std::vector<Pixel>& left_pixels, std::vector<Pixel>& right_pixels, const Scene& scene, std::vector<float>& shadow_map)
+{
+	for (int i = 0; i < left_pixels.size(); i++)
+	{
+		std::vector<Pixel> row;
+		ComputeLine(left_pixels[i], right_pixels[i], row);
+		for (auto pixel : row)
+		{
+			if (pixel.pos.x >= 0 && pixel.pos.x < SCREEN_WIDTH && pixel.pos.y >= 0 && pixel.pos.y < SCREEN_HEIGHT)
+			{
+				DrawPixelShadow(pixel, scene, shadow_map);
+			}
+		}
+	}
+}
+
+void DrawPixelShadow(const Pixel& pixel, const Scene& scene, std::vector<float>& shadow_map)
+{
+	if (pixel.z_inv > shadow_map[pixel.pos.y * SCREEN_WIDTH + pixel.pos.x])
+	{
+		shadow_map[pixel.pos.y * SCREEN_WIDTH + pixel.pos.x] = pixel.z_inv;
+	}
+}
 
 void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line)
 {
@@ -211,7 +252,7 @@ void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line)
 	Interpolate(a, b, line);
 }
 
-void DrawTriangle(const Triangle& triangle, const Scene& scene, glm::mat4& world, glm::mat4& projection, std::vector<float>& depth_buffer, std::vector<float>& shadow_map)
+void DrawTriangle(const Triangle& triangle, const Scene& scene, glm::mat4& world, glm::mat4& projection, glm::mat4& worldToLight, glm::mat4& lightProjection, std::vector<float>& depth_buffer, std::vector<float>& shadow_map)
 {
 	std::vector<Pixel> vertex_pixels(3);
 	vertex_pixels[0] = VertexToPixel(glm::vec3(triangle.v0_), triangle, scene, world, projection);
@@ -221,7 +262,7 @@ void DrawTriangle(const Triangle& triangle, const Scene& scene, glm::mat4& world
 	std::vector<Pixel> left_pixels;
 	std::vector<Pixel> right_pixels;
 	ComputePolygonRows(vertex_pixels, left_pixels, right_pixels);
-	DrawPolygonRows(left_pixels, right_pixels, scene, depth_buffer, shadow_map);
+	DrawPolygonRows(left_pixels, right_pixels, scene, worldToLight, lightProjection, depth_buffer, shadow_map);
 }
 
 void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pixel>& left_pixels, std::vector<Pixel>& right_pixels)
@@ -293,7 +334,7 @@ void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pix
 // 	DrawLineSDL(screen, p2.pos, p0.pos, color);
 // }
 
-void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map)
+void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const Scene& scene, glm::mat4& worldToLight, glm::mat4& lightProjection, std::vector<float>& depth_buffer, std::vector<float>& shadow_map)
 {
 	for (int i = 0; i < left_pixels.size(); i++)
 	{
@@ -303,18 +344,18 @@ void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pi
 		{
 			if (pixel.pos.x >= 0 && pixel.pos.x < SCREEN_WIDTH && pixel.pos.y >= 0 && pixel.pos.y < SCREEN_HEIGHT)
 			{
-				DrawPixel(pixel, scene, depth_buffer, shadow_map);
+				DrawPixel(pixel, scene, worldToLight, lightProjection, depth_buffer, shadow_map);
 			}
 		}
 	}
 }
 
-void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map)
+void DrawPixel(const Pixel& pixel, const Scene& scene, glm::mat4& worldToLight, glm::mat4& lightProjection, std::vector<float>& depth_buffer, std::vector<float>& shadow_map)
 {
 	if (pixel.z_inv > depth_buffer[pixel.pos.y * SCREEN_WIDTH + pixel.pos.x])
 	{
 		depth_buffer[pixel.pos.y * SCREEN_WIDTH + pixel.pos.x] = pixel.z_inv;
-
+		float shadow = InShadow(pixel.world_pos, scene, worldToLight, lightProjection, shadow_map);
 		auto illumination = glm::vec3(0.0f);
 		for (auto light : scene.lights_)
 		{
@@ -323,11 +364,19 @@ void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth
 			vec3 camera_pixel_to_light = light.camera_position - pixel.camera_pos;
 
 			vec3 direct_light = light.color * std::max(abs(glm::dot(glm::normalize(camera_pixel_to_light), glm::normalize(pixel.camera_normal))), 0.0f) / float(4.0f * M_PI * glm::dot(camera_pixel_to_light, camera_pixel_to_light));
-			illumination += direct_light * pixel.diffuse_reflectance + scene.indirect_light_ * pixel.indirect_reflectance;
+			illumination += (1.0f - shadow)*(direct_light * pixel.diffuse_reflectance) + scene.indirect_light_ * pixel.indirect_reflectance;
 		}
 
 		PutPixelSDL(screen, pixel.pos.x, pixel.pos.y, illumination);
 	}
+}
+
+float InShadow(glm::vec3 world_pos, const Scene& scene, glm::mat4& worldToLight, glm::mat4& lightProjection, std::vector<float>& shadow_map)
+{
+	world_pos.z = 1.0f/world_pos.z; 
+	Pixel pix = VertexToPixel(world_pos, useLessTri, scene, worldToLight, lightProjection);
+	float shadow = pix.z_inv < shadow_map[pix.pos.y * SCREEN_WIDTH + pix.pos.x] ? 0.0f : 1.0f;
+	return shadow;
 }
 
 Pixel VertexToPixel(const glm::vec3 world_pos, const Triangle& triangle, const Scene &scene, glm::mat4& world, glm::mat4& projection)
@@ -337,7 +386,8 @@ Pixel VertexToPixel(const glm::vec3 world_pos, const Triangle& triangle, const S
 	glm::vec4 projected = projection * camera_vertex_position;
 	//Clip here
 	glm::vec3 screen = glm::vec3(projected/projected.w);
-
+	glm::vec3 world_pos_copy(world_pos);
+	world_pos_copy.z = 1.0f / world_pos_copy.z;
 	return Pixel{
 		glm::ivec2(
 			SCREEN_WIDTH * ( screen.x  + 1.0f) / 2.0f,
@@ -347,7 +397,7 @@ Pixel VertexToPixel(const glm::vec3 world_pos, const Triangle& triangle, const S
 		triangle.normal,
 		triangle.color,
 		triangle.color,
-		world_pos
+		world_pos_copy
 	};
 }
 
