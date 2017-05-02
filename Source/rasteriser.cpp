@@ -60,6 +60,8 @@ void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pi
 void DrawPixel(const Pixel& pixel, const Scene& scene, glm::mat4& worldToLight, glm::mat4& lightProjection, std::vector<float>& depth_buffer, std::vector<float>& shadow_map);
 Pixel VertexToPixel(const glm::vec3 world_vertex, const Triangle& triangle, const Scene &scene, glm::mat4& world, glm::mat4& projection);
 
+glm::mat4 cameraToWorld;
+
 int main(int argc, char *argv[]) {
 	screen = InitializeSDL(SCREEN_WIDTH, SCREEN_HEIGHT);
 	t = SDL_GetTicks();    // Set start value for timer.
@@ -167,6 +169,7 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<floa
 	}
 
 	glm::mat4 camera_projection = glm::perspective(90.0f, (float)SCREEN_WIDTH/(float)SCREEN_HEIGHT, 0.1f, 7.5f );
+	cameraToWorld = glm::inverse(scene.camera_.worldToCamera) ;
 
 	glm::mat4 worldToLight = lookAt (scene.lights_[0].position, scene.lights_[0].position + glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	glm::mat4 lightProjection = glm::ortho(-3.0f, 3.0f, -3.0f, 3.0f, 0.1f, 100.0f );
@@ -355,7 +358,7 @@ void DrawPixel(const Pixel& pixel, const Scene& scene, glm::mat4& worldToLight, 
 	if (pixel.z_inv > depth_buffer[pixel.pos.y * SCREEN_WIDTH + pixel.pos.x])
 	{
 		depth_buffer[pixel.pos.y * SCREEN_WIDTH + pixel.pos.x] = pixel.z_inv;
-		float shadow = InShadow(pixel.world_pos, scene, worldToLight, lightProjection, shadow_map);
+		float shadow = InShadow(pixel.world_pos * pixel.z_inv, scene, worldToLight, lightProjection, shadow_map);
 		auto illumination = glm::vec3(0.0f);
 		for (auto light : scene.lights_)
 		{
@@ -371,10 +374,11 @@ void DrawPixel(const Pixel& pixel, const Scene& scene, glm::mat4& worldToLight, 
 	}
 }
 
-float InShadow(glm::vec3 world_pos, const Scene& scene, glm::mat4& worldToLight, glm::mat4& lightProjection, std::vector<float>& shadow_map)
+float InShadow(glm::vec3 camera_pos, const Scene& scene, glm::mat4& worldToLight, glm::mat4& lightProjection, std::vector<float>& shadow_map)
 {
-	world_pos.z = 1.0f/world_pos.z; 
-	Pixel pix = VertexToPixel(world_pos, useLessTri, scene, worldToLight, lightProjection);
+	glm::vec4 world_pos = cameraToWorld * glm::vec4(camera_pos, 1.0f);
+
+	Pixel pix = VertexToPixel(glm::vec3(world_pos), useLessTri, scene, worldToLight, lightProjection);
 	float shadow = pix.z_inv < shadow_map[pix.pos.y * SCREEN_WIDTH + pix.pos.x] ? 0.0f : 1.0f;
 	return shadow;
 }
