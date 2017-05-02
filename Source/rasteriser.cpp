@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
 	},
 		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
 			0.2f * glm::vec3(1.0f, 1.0f, 1.0f),
-			Camera( glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f ));
+			Camera( glm::vec3(0.0f, 0.0f, -1.6f), 0.0f, 0.0f, 0.0f ));
 
 	auto bunny_scene = Scene(
 		std::vector<ModelInstance> { ModelInstance(Model("Resources/bunny.obj"), glm::vec3(0.0f, 0.0f, 0.0f)) },
@@ -171,10 +171,14 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<floa
 	glm::mat4 camera_projection = glm::perspective(90.0f, (float)SCREEN_WIDTH/(float)SCREEN_HEIGHT, 0.1f, 7.5f );
 	cameraToWorld = glm::inverse(scene.camera_.worldToCamera) ;
 
-	glm::mat4 worldToLight = lookAt (scene.lights_[0].position, scene.lights_[0].position + glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-	glm::mat4 lightProjection = glm::ortho(-3.0f, 3.0f, -3.0f, 3.0f, 0.1f, 100.0f );
-	
-	ComputeShadowMap(triangles, scene, worldToLight, camera_projection, shadow_map);
+	glm::mat4 worldToLight = glm::lookAt (scene.lights_[0].position, scene.lights_[0].position + glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	worldToLight = glm::rotate(worldToLight, glm::radians(350.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+	glm::mat4 lightProjection = glm::ortho(-2.0f, 2.0f, -2.0f, 2.0f, 0.1f, 10.0f );
+
+	//glm::mat4 lightProjection(1.0f);
+	//lightProjection[3][2] = 0.0f;
+
+	ComputeShadowMap(triangles, scene, worldToLight, lightProjection, shadow_map);
 
 	for (auto triangle : triangles)
 	{
@@ -182,19 +186,19 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<floa
 		//DrawTriangleEdges(triangle, scene);
 	}
 
-	// for(int y = 0; y < SCREEN_HEIGHT; y++)
-	// {
-	// 	for(int x = 0; x < SCREEN_WIDTH; x++)
-	// 	{
-	// 		if(shadow_map[y * SCREEN_WIDTH + x] != 0.0f)
-	// 		{
-	// 			std::cout << "(" << x << ", " << y << "): ";
-	// 			std::cout << shadow_map[y * SCREEN_WIDTH + x] << std::endl;
-	// 		}
+	for(int y = 0; y < SCREEN_HEIGHT; y++)
+	{
+		for(int x = 0; x < SCREEN_WIDTH; x++)
+		{
+			// if(shadow_map[y * SCREEN_WIDTH + x] != 0.0f)
+			// {
+			// 	std::cout << "(" << x << ", " << y << "): ";
+			// 	std::cout << shadow_map[y * SCREEN_WIDTH + x] << std::endl;
+			// }
 			
-	// 		PutPixelSDL(screen, x, y, glm::vec3(1.0f / shadow_map[y * SCREEN_WIDTH + x], 1.0f /  shadow_map[y * SCREEN_WIDTH + x], 1.0f /  shadow_map[y * SCREEN_WIDTH + x]) ) ;
-	// 	}
-	// }
+			//PutPixelSDL(screen, x, y, glm::vec3( shadow_map[y * SCREEN_WIDTH + x],  shadow_map[y * SCREEN_WIDTH + x],  shadow_map[y * SCREEN_WIDTH + x]) ) ;
+		}
+	}
 
 	if (SDL_MUSTLOCK(screen))
 		SDL_UnlockSurface(screen);
@@ -358,7 +362,7 @@ void DrawPixel(const Pixel& pixel, const Scene& scene, glm::mat4& worldToLight, 
 	if (pixel.z_inv > depth_buffer[pixel.pos.y * SCREEN_WIDTH + pixel.pos.x])
 	{
 		depth_buffer[pixel.pos.y * SCREEN_WIDTH + pixel.pos.x] = pixel.z_inv;
-		float shadow = InShadow(pixel.world_pos * pixel.z_inv, scene, worldToLight, lightProjection, shadow_map);
+		float shadow = InShadow(pixel.camera_pos, scene, worldToLight, lightProjection, shadow_map);
 		auto illumination = glm::vec3(0.0f);
 		for (auto light : scene.lights_)
 		{
@@ -379,6 +383,7 @@ float InShadow(glm::vec3 camera_pos, const Scene& scene, glm::mat4& worldToLight
 	glm::vec4 world_pos = cameraToWorld * glm::vec4(camera_pos, 1.0f);
 
 	Pixel pix = VertexToPixel(glm::vec3(world_pos), useLessTri, scene, worldToLight, lightProjection);
+
 	float shadow = pix.z_inv < shadow_map[pix.pos.y * SCREEN_WIDTH + pix.pos.x] ? 0.0f : 1.0f;
 	return shadow;
 }
@@ -390,8 +395,6 @@ Pixel VertexToPixel(const glm::vec3 world_pos, const Triangle& triangle, const S
 	glm::vec4 projected = projection * camera_vertex_position;
 	//Clip here
 	glm::vec3 screen = glm::vec3(projected/projected.w);
-	glm::vec3 world_pos_copy(world_pos);
-	world_pos_copy.z = 1.0f / world_pos_copy.z;
 	return Pixel{
 		glm::ivec2(
 			SCREEN_WIDTH * ( screen.x  + 1.0f) / 2.0f,
@@ -401,7 +404,6 @@ Pixel VertexToPixel(const glm::vec3 world_pos, const Triangle& triangle, const S
 		triangle.normal,
 		triangle.color,
 		triangle.color,
-		world_pos_copy
 	};
 }
 
