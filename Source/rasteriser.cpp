@@ -62,7 +62,7 @@ void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pix
 void DrawTriangleEdges(const Triangle& triangle, const Scene &scene);
 void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map, std::vector<glm::vec3>& frame_buffer);
 void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map, std::vector<glm::vec3>& frame_buffer);
-Pixel VertexToPixel(const glm::vec3 world_vertex, const Triangle& triangle, const Scene &scene, glm::mat4& world, glm::mat4& projection);
+Pixel VertexToPixel(const glm::vec3& world_vertex, const Triangle& triangle, const Scene &scene, glm::mat4& world, glm::mat4& projection);
 
 void DrawToScreen(std::vector<glm::vec3>& frame_buffer);
 
@@ -164,6 +164,9 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<floa
 		for(int x = 0; x < PIXELS_X; x++)
 		{
 			depth_buffer[y * PIXELS_X + x] = 0;
+			frame_buffer[y * PIXELS_X + x].x = 0;
+			frame_buffer[y * PIXELS_X + x].y = 0;
+			frame_buffer[y * PIXELS_X + x].z = 0;
 		}
 	}
 
@@ -363,7 +366,7 @@ void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth
 	}
 }
 
-Pixel VertexToPixel(const glm::vec3 world_pos, const Triangle& triangle, const Scene &scene, glm::mat4& world, glm::mat4& projection)
+Pixel VertexToPixel(const glm::vec3& world_pos, const Triangle& triangle, const Scene &scene, glm::mat4& world, glm::mat4& projection)
 {
 	glm::vec4 camera_vertex_position = world * glm::vec4(world_pos, 1.0f);
 
