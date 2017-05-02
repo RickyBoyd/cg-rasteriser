@@ -36,11 +36,19 @@ using glm::ivec2;
 
 const int SCREEN_WIDTH = 500;
 const int SCREEN_HEIGHT = 500;
+
+const int AA_SAMPLES = 2;
+
+const int PIXELS_X = SCREEN_WIDTH * AA_SAMPLES;
+const int PIXELS_Y = SCREEN_HEIGHT * AA_SAMPLES;
+
 //const int AA_SAMPLES = 4;
 //const glm::vec2 JITTER_MATRIX[AA_SAMPLES] = { glm::vec2(-0.25, 0.75), glm::vec2(0.75, 0.25), glm::vec2(-0.75, -0.25), glm::vec2(0.25, -0.75) };
 SDL_Surface *screen;
 int t;
 const float FOCAL_LENGTH = SCREEN_WIDTH / 2;
+
+std::vector<glm::vec3> frame_buffer;
 
 void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<float>& depth_buffer, std::vector<float>& shadow_map);
 void Update(Scene &scene, Uint8 &light_selected);
@@ -57,6 +65,8 @@ void DrawTriangleEdges(const Triangle& triangle, const Scene &scene);
 void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map);
 void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map);
 Pixel VertexToPixel(const glm::vec3 world_vertex, const Triangle& triangle, const Scene &scene, glm::mat4& world, glm::mat4& projection);
+
+void DrawToScreen();
 
 int main(int argc, char *argv[]) {
 	screen = InitializeSDL(SCREEN_WIDTH, SCREEN_HEIGHT);
@@ -119,10 +129,12 @@ int main(int argc, char *argv[]) {
 	std::cout << "Loaded " << world_tris.size() << " tris" << std::endl;
 
 	std::vector<float> depth_buffer;
-	depth_buffer.resize(SCREEN_WIDTH * SCREEN_HEIGHT);
+	depth_buffer.resize(PIXELS_X * PIXELS_Y);
 
 	std::vector<float> shadow_map;
-	shadow_map.resize(SCREEN_WIDTH * SCREEN_HEIGHT);
+	shadow_map.resize(PIXELS_X * PIXELS_Y);
+
+	frame_buffer.resize(PIXELS_X * PIXELS_Y);
 
 	while (NoQuitMessageSDL()) {
 		Draw(scene, world_tris, depth_buffer, shadow_map);
@@ -148,23 +160,23 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<floa
 		light.UpdateCameraSpacePosition(scene.camera_);
 	}
 
-	for(int y = 0; y < SCREEN_HEIGHT; y++)
+	for(int y = 0; y < PIXELS_Y; y++)
 	{
-		for(int x = 0; x < SCREEN_WIDTH; x++)
+		for(int x = 0; x < PIXELS_X; x++)
 		{
-			depth_buffer[y * SCREEN_WIDTH + x] = 0;
+			depth_buffer[y * PIXELS_X + x] = 0;
 		}
 	}
 
-	for(int y = 0; y < SCREEN_HEIGHT; y++)
+	for(int y = 0; y < PIXELS_Y; y++)
 	{
-		for(int x = 0; x < SCREEN_WIDTH; x++)
+		for(int x = 0; x < PIXELS_X; x++)
 		{
-			shadow_map[y * SCREEN_WIDTH + x] = 0;
+			shadow_map[y * PIXELS_X + x] = 0;
 		}
 	}
 
-	glm::mat4 camera_projection = glm::perspective(90.0f, (float)SCREEN_WIDTH/(float)SCREEN_HEIGHT, 0.1f, 7.5f );
+	glm::mat4 camera_projection = glm::perspective(90.0f, (float)PIXELS_X/(float)PIXELS_Y, 0.1f, 7.5f );
 
 	//glm::worldToLight;
 	//glm::mat4 light_projection = glm::ortho(2.0f, 2.0f, 0.1f, 10.0f );
@@ -175,6 +187,9 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<floa
 		DrawTriangle(triangle, scene, scene.camera_.worldToCamera, camera_projection, depth_buffer, shadow_map);
 		//DrawTriangleEdges(triangle, scene);
 	}
+
+	DrawToScreen();
+
 	if (SDL_MUSTLOCK(screen))
 		SDL_UnlockSurface(screen);
 	SDL_UpdateRect(screen, 0, 0, 0, 0);
@@ -201,6 +216,25 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<floa
 // 	DrawPolygonRowsShadow(left_pixels, right_pixels, scene, depth_buffer);
 // }
 
+void DrawToScreen()
+{
+	for(int y = 0; y < SCREEN_HEIGHT; y++)
+	{
+		for(int x = 0; x < SCREEN_WIDTH; x++)
+		{
+			vec3 colour = glm::vec3(0.0f, 0.0f, 0.0f);
+			for(int y_buff = y*AA_SAMPLES; y_buff < y*AA_SAMPLES + AA_SAMPLES; y_buff++ )
+			{
+				for(int x_buff = x*AA_SAMPLES; x_buff < x*AA_SAMPLES + AA_SAMPLES; x_buff++ )
+				{
+					colour += frame_buffer[y_buff * PIXELS_X + x_buff];
+				}
+			}
+			colour /= (float)(AA_SAMPLES*AA_SAMPLES);
+			PutPixelSDL(screen, x, y, colour);
+		}
+	}
+}
 
 void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line)
 {
@@ -301,7 +335,7 @@ void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pi
 		ComputeLine(left_pixels[i], right_pixels[i], row);
 		for (auto pixel : row)
 		{
-			if (pixel.pos.x >= 0 && pixel.pos.x < SCREEN_WIDTH && pixel.pos.y >= 0 && pixel.pos.y < SCREEN_HEIGHT)
+			if (pixel.pos.x >= 0 && pixel.pos.x < PIXELS_X && pixel.pos.y >= 0 && pixel.pos.y < PIXELS_Y)
 			{
 				DrawPixel(pixel, scene, depth_buffer, shadow_map);
 			}
@@ -311,9 +345,9 @@ void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pi
 
 void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map)
 {
-	if (pixel.z_inv > depth_buffer[pixel.pos.y * SCREEN_WIDTH + pixel.pos.x])
+	if (pixel.z_inv > depth_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x])
 	{
-		depth_buffer[pixel.pos.y * SCREEN_WIDTH + pixel.pos.x] = pixel.z_inv;
+		depth_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x] = pixel.z_inv;
 
 		auto illumination = glm::vec3(0.0f);
 		for (auto light : scene.lights_)
@@ -325,8 +359,8 @@ void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth
 			vec3 direct_light = light.color * std::max(abs(glm::dot(glm::normalize(camera_pixel_to_light), glm::normalize(pixel.camera_normal))), 0.0f) / float(4.0f * M_PI * glm::dot(camera_pixel_to_light, camera_pixel_to_light));
 			illumination += direct_light * pixel.diffuse_reflectance + scene.indirect_light_ * pixel.indirect_reflectance;
 		}
-
-		PutPixelSDL(screen, pixel.pos.x, pixel.pos.y, illumination);
+		frame_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x] = illumination;
+		//PutPixelSDL(screen, pixel.pos.x, pixel.pos.y, illumination);
 	}
 }
 
@@ -340,8 +374,8 @@ Pixel VertexToPixel(const glm::vec3 world_pos, const Triangle& triangle, const S
 
 	return Pixel{
 		glm::ivec2(
-			SCREEN_WIDTH * ( screen.x  + 1.0f) / 2.0f,
-			SCREEN_HEIGHT * ( screen.y +  1.0f) / 2.0f),
+			PIXELS_X * ( screen.x  + 1.0f) / 2.0f,
+			PIXELS_Y * ( screen.y +  1.0f) / 2.0f),
 		camera_vertex_position.z == 0.0f ? std::numeric_limits<float>::max() : 1.0f / camera_vertex_position.z,
 		glm::vec3(camera_vertex_position),
 		triangle.normal,
