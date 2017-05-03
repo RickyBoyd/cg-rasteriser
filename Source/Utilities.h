@@ -14,8 +14,6 @@ struct Pixel
 	float z_inv;
 	glm::vec3 camera_pos; // 3d position in camera coordinate system
 	glm::vec3 camera_normal; // normal in camera coordinate system
-	glm::vec3 diffuse_reflectance;
-	glm::vec3 indirect_reflectance;
 	glm::vec2 vt;
 };
 

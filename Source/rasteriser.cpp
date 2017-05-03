@@ -60,8 +60,8 @@ void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line);
 void DrawTriangle(const Triangle& triangle, const Scene& scene, glm::mat4& world, glm::mat4& projection, std::vector<float>& depth_buffer, std::vector<float>& shadow_map, std::vector<glm::vec3>& frame_buffer);
 void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pixel>& left_pixels, std::vector<Pixel>& right_pixels);
 void DrawTriangleEdges(const Triangle& triangle, const Scene &scene);
-void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map, std::vector<glm::vec3>& frame_buffer);
-void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map, std::vector<glm::vec3>& frame_buffer);
+void DrawPolygonRows(const Triangle &triangle, const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map, std::vector<glm::vec3>& frame_buffer);
+void DrawPixel(const Pixel& pixel, const Triangle &triangle, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map, std::vector<glm::vec3>& frame_buffer);
 Pixel VertexToPixel(const glm::vec3& world_vertex, const Triangle& triangle, const glm::vec2 vt, const Scene &scene, glm::mat4& world, glm::mat4& projection);
 
 void DrawToScreen(std::vector<glm::vec3>& frame_buffer);
@@ -89,6 +89,15 @@ int main(int argc, char *argv[]) {
 		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
 		0.2f * glm::vec3(1.0f, 1.0f, 1.0f),
 		Camera( glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f, 1.0f ));
+
+	auto cornell_box_scene_textured = Scene(
+		std::vector<ModelInstance> { ModelInstance(Model("Resources/cornell_box.obj")), 
+			ModelInstance(Model("Resources/cube_textured.obj"), glm::vec3(-0.5f, -0.5f, -0.5f)) },
+		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
+		0.2f * glm::vec3(1.0f, 1.0f, 1.0f),
+		Camera( glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f, 0.4f ));
+
+
 
 #ifdef IMPORT_COMPLEX_MODELS
 	auto bunny_box_scene = Scene(
@@ -121,7 +130,7 @@ int main(int argc, char *argv[]) {
 			Camera( glm::vec3(0.0f, 4.0f, -7.0f), 30.0f, 0.0f, 0.0f ));
 #endif
 
-	Scene &scene = cornell_box_scene;
+	Scene &scene = cornell_box_scene_textured;
 
 	std::vector<Triangle> world_tris = scene.ToTriangles();
 	std::cout << "Loaded " << world_tris.size() << " tris" << std::endl;
@@ -257,7 +266,7 @@ void DrawTriangle(const Triangle& triangle, const Scene& scene, glm::mat4& world
 	std::vector<Pixel> left_pixels;
 	std::vector<Pixel> right_pixels;
 	ComputePolygonRows(vertex_pixels, left_pixels, right_pixels);
-	DrawPolygonRows(left_pixels, right_pixels, scene, depth_buffer, shadow_map, frame_buffer);
+	DrawPolygonRows(triangle, left_pixels, right_pixels, scene, depth_buffer, shadow_map, frame_buffer);
 }
 
 void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pixel>& left_pixels, std::vector<Pixel>& right_pixels)
@@ -329,7 +338,7 @@ void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pix
 // 	DrawLineSDL(screen, p2.pos, p0.pos, color);
 // }
 
-void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map, std::vector<glm::vec3>& frame_buffer)
+void DrawPolygonRows(const Triangle &triangle, const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map, std::vector<glm::vec3>& frame_buffer)
 {
 	for (int i = 0; i < left_pixels.size(); i++)
 	{
@@ -339,13 +348,13 @@ void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pi
 		{
 			if (pixel.pos.x >= 0 && pixel.pos.x < PIXELS_X && pixel.pos.y >= 0 && pixel.pos.y < PIXELS_Y)
 			{
-				DrawPixel(pixel, scene, depth_buffer, shadow_map, frame_buffer);
+				DrawPixel(pixel, triangle, scene, depth_buffer, shadow_map, frame_buffer);
 			}
 		}
 	}
 }
 
-void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map, std::vector<glm::vec3>& frame_buffer)
+void DrawPixel(const Pixel& pixel, const Triangle &triangle, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map, std::vector<glm::vec3>& frame_buffer)
 {
 	if (pixel.z_inv > depth_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x])
 	{
@@ -362,7 +371,8 @@ void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth
 			vec3 camera_pixel_to_light = light.camera_position - pixel.camera_pos;
 
 			vec3 direct_light = light.color * std::max(abs(glm::dot(glm::normalize(camera_pixel_to_light), glm::normalize(pixel.camera_normal))), 0.0f) / float(4.0f * M_PI * glm::dot(camera_pixel_to_light, camera_pixel_to_light));
-			frame_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x] += direct_light * pixel.diffuse_reflectance + scene.indirect_light_ * pixel.indirect_reflectance;
+			//std::cout << "x: " << pixel.vt.x << ", y: " << pixel.vt.y << "\n";
+			frame_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x] += direct_light * triangle.GetDiffuseColour(pixel.vt) + scene.indirect_light_ * triangle.GetAmbientColour(pixel.vt);
 		}
 		//frame_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x] = illumination;
 	}
@@ -383,8 +393,6 @@ Pixel VertexToPixel(const glm::vec3& world_pos, const Triangle& triangle, const 
 		camera_vertex_position.z == 0.0f ? std::numeric_limits<float>::max() : 1.0f / camera_vertex_position.z,
 		glm::vec3(camera_vertex_position),
 		triangle.normal_,
-		triangle.GetDiffuseColour(vt),
-		triangle.GetAmbientColour(vt),
 		vt
 	};
 }

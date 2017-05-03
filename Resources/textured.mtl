@@ -1,0 +1,22 @@
+newmtl cube
+   Ka 0.750 0.750 0.750
+   Kd 1.000 1.000 1.000
+   Ks 0.000 0.000 0.000
+	Ns 100.000
+   d 1.0
+   illum 2
+   Ni 0.0
+   map_Ka cube.png
+   map_Kd cube.png
+   map_Ks cube_specular_colour.png
+   map_Ns cube_specular_intensity.png
+   
+newmtl pirate
+	Ka 1.000 1.000 1.000
+	Kd 1.000 1.000 1.000
+	Ks 0.000 0.000 0.000
+	d 1.0
+	illum 2
+	Ni 0.0
+	map_Ka palitra.png
+	map_Kd palitra.png
