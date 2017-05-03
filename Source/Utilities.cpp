@@ -14,7 +14,7 @@ void Interpolate(const Pixel a, const Pixel b, std::vector<Pixel>& result)
 	auto step_normal = (b.camera_normal - a.camera_normal) / divisor_step; // Not strictly necessary if we're interpolating triangles
 	auto step_diffuse_reflectance = (b.diffuse_reflectance - a.diffuse_reflectance) / divisor_step;
 	auto step_indirect_reflectance = (b.indirect_reflectance - a.indirect_reflectance) / divisor_step;
-	auto step_world_pos = (b.world_pos - a.world_pos) / divisor_step;
+	auto step_vt = (b.vt * b.z_inv - a.vt * a.z_inv) / divisor_step;
 
 	auto current_pos = glm::vec2(a.pos);
 	auto current_z_inv = a.z_inv;
@@ -22,17 +22,17 @@ void Interpolate(const Pixel a, const Pixel b, std::vector<Pixel>& result)
 	auto current_normal = a.camera_normal;
 	auto current_diffuse_reflectance = a.diffuse_reflectance;
 	auto current_indirect_reflectance = a.indirect_reflectance;
-	auto current_world_pos = a.world_pos;
+	auto current_vt = a.vt * a.z_inv;
 	for (int i = 0; i < N; ++i)
 	{
-		result[i] = Pixel { glm::round(current_pos), current_z_inv, current_camera_pos / current_z_inv, current_normal, current_diffuse_reflectance, current_indirect_reflectance, current_world_pos };
+		result[i] = Pixel { glm::round(current_pos), current_z_inv, current_camera_pos / current_z_inv, current_normal, current_diffuse_reflectance, current_indirect_reflectance, current_vt * current_z_inv };
 		current_pos += step_pos;
 		current_z_inv += step_z_inv;
 		current_camera_pos += step_camera_pos;
 		current_normal += step_normal;
 		current_diffuse_reflectance += step_diffuse_reflectance;
 		current_indirect_reflectance += step_indirect_reflectance;
-		current_world_pos += step_world_pos;
+		current_vt += step_vt;
 	}
 }
 

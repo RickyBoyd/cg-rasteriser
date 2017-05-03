@@ -62,7 +62,7 @@ void ComputePolygonRows(const std::vector<Pixel>& vertex_pixels, std::vector<Pix
 void DrawTriangleEdges(const Triangle& triangle, const Scene &scene);
 void DrawPolygonRows(const std::vector<Pixel>& left_pixels, const std::vector<Pixel>& right_pixels, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map, std::vector<glm::vec3>& frame_buffer);
 void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map, std::vector<glm::vec3>& frame_buffer);
-Pixel VertexToPixel(const glm::vec3& world_vertex, const Triangle& triangle, const Scene &scene, glm::mat4& world, glm::mat4& projection);
+Pixel VertexToPixel(const glm::vec3& world_vertex, const Triangle& triangle, const glm::vec2 vt, const Scene &scene, glm::mat4& world, glm::mat4& projection);
 
 void DrawToScreen(std::vector<glm::vec3>& frame_buffer);
 
@@ -250,9 +250,9 @@ void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line)
 void DrawTriangle(const Triangle& triangle, const Scene& scene, glm::mat4& world, glm::mat4& projection, std::vector<float>& depth_buffer, std::vector<float>& shadow_map, std::vector<glm::vec3>& frame_buffer)
 {
 	std::vector<Pixel> vertex_pixels(3);
-	vertex_pixels[0] = VertexToPixel(glm::vec3(triangle.v0_), triangle, scene, world, projection);
-	vertex_pixels[1] = VertexToPixel(glm::vec3(triangle.v1_), triangle, scene, world, projection);
-	vertex_pixels[2] = VertexToPixel(glm::vec3(triangle.v2_), triangle, scene, world, projection);
+	vertex_pixels[0] = VertexToPixel(glm::vec3(triangle.v0_), triangle, glm::vec2(1.0f, 0.0f), scene, world, projection);
+	vertex_pixels[1] = VertexToPixel(glm::vec3(triangle.v1_), triangle, glm::vec2(1.0f, 0.0f), scene, world, projection);
+	vertex_pixels[2] = VertexToPixel(glm::vec3(triangle.v2_), triangle, glm::vec2(1.0f, 0.0f), scene, world, projection);
 
 	std::vector<Pixel> left_pixels;
 	std::vector<Pixel> right_pixels;
@@ -368,7 +368,7 @@ void DrawPixel(const Pixel& pixel, const Scene& scene, std::vector<float>& depth
 	}
 }
 
-Pixel VertexToPixel(const glm::vec3& world_pos, const Triangle& triangle, const Scene &scene, glm::mat4& world, glm::mat4& projection)
+Pixel VertexToPixel(const glm::vec3& world_pos, const Triangle& triangle, const glm::vec2 vt, const Scene &scene, glm::mat4& world, glm::mat4& projection)
 {
 	glm::vec4 camera_vertex_position = world * glm::vec4(world_pos, 1.0f);
 
@@ -385,7 +385,7 @@ Pixel VertexToPixel(const glm::vec3& world_pos, const Triangle& triangle, const 
 		triangle.normal,
 		triangle.color,
 		triangle.color,
-		world_pos
+		vt
 	};
 }
 
