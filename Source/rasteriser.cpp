@@ -250,9 +250,9 @@ void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line)
 void DrawTriangle(const Triangle& triangle, const Scene& scene, glm::mat4& world, glm::mat4& projection, std::vector<float>& depth_buffer, std::vector<float>& shadow_map, std::vector<glm::vec3>& frame_buffer)
 {
 	std::vector<Pixel> vertex_pixels(3);
-	vertex_pixels[0] = VertexToPixel(glm::vec3(triangle.v0_), triangle, glm::vec2(1.0f, 0.0f), scene, world, projection);
-	vertex_pixels[1] = VertexToPixel(glm::vec3(triangle.v1_), triangle, glm::vec2(1.0f, 0.0f), scene, world, projection);
-	vertex_pixels[2] = VertexToPixel(glm::vec3(triangle.v2_), triangle, glm::vec2(1.0f, 0.0f), scene, world, projection);
+	vertex_pixels[0] = VertexToPixel(glm::vec3(triangle.v0_), triangle, triangle.vt0_, scene, world, projection);
+	vertex_pixels[1] = VertexToPixel(glm::vec3(triangle.v1_), triangle, triangle.vt1_, scene, world, projection);
+	vertex_pixels[2] = VertexToPixel(glm::vec3(triangle.v2_), triangle, triangle.vt2_, scene, world, projection);
 
 	std::vector<Pixel> left_pixels;
 	std::vector<Pixel> right_pixels;
