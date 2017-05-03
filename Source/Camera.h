@@ -13,7 +13,7 @@ public:
 	Camera(glm::vec3 position, float pitch, float yaw, float roll, float focal_length);
 
 	//Getter for camera position
-	glm::vec3 Position();
+	glm::vec3 Position() const;
 
 	void ComputeCameraTransform(float pitch, float yaw, float roll);
 

@@ -258,6 +258,16 @@ void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line)
 
 void DrawTriangle(const Triangle& triangle, const Scene& scene, glm::mat4& world, glm::mat4& projection, std::vector<float>& depth_buffer, std::vector<float>& shadow_map, std::vector<glm::vec3>& frame_buffer)
 {
+	glm::vec3 triCentre = glm::vec3(triangle.v0_ + triangle.v1_ + triangle.v2_ / 3.0f);
+
+	glm::vec3 camToTri = scene.camera_.Position() - triCentre;
+
+	float dot = glm::dot(camToTri, triangle.normal_);
+	if(dot < -0.1)
+	{
+		return;
+	}
+
 	std::vector<Pixel> vertex_pixels(3);
 	vertex_pixels[0] = VertexToPixel(glm::vec3(triangle.v0_), triangle, triangle.vt0_, scene, world, projection);
 	vertex_pixels[1] = VertexToPixel(glm::vec3(triangle.v1_), triangle, triangle.vt1_, scene, world, projection);
@@ -384,6 +394,7 @@ Pixel VertexToPixel(const glm::vec3& world_pos, const Triangle& triangle, const 
 
 	glm::vec4 projected = projection * camera_vertex_position;
 	//Clip here
+
 	glm::vec3 screen = glm::vec3(projected/projected.w);
 
 	return Pixel{
@@ -396,6 +407,151 @@ Pixel VertexToPixel(const glm::vec3& world_pos, const Triangle& triangle, const 
 		vt
 	};
 }
+
+// void Clip(std::vector<glm::vec4> vertices, std::vector<glm::vec4> &out_vertices)
+// {
+// 	for(int i = 0; i < 3; i++)
+// 	{
+// 		out_vertices[i] = vertices[i];
+// 	}
+// 	ClipPolygonOnWAxis(vertices, out_vertices);
+// 	ClipPolygonForAxis(vertices, 0, out_vertices);
+// 	ClipPolygonForAxis(vertices, 1, out_vertices);
+// 	ClipPolygonForAxis(vertices, 2, out_vertices);
+// 	//PolygonToTriangles(clipped_vertices, triangle, out_triangles);
+// }
+
+
+// void ClipPolygonOnWAxis(std::vector<glm::vec4>& vertices, std::vector<glm::vec4> &out)
+// {
+//     char previousInside;
+//     char currentInside;
+	
+//     float a;
+//     glm::vec4 intersectionPoint; 
+
+//     glm::vec4 currentVertex;  
+//     glm::vec4 previousVertex = vertices[2];
+
+//     previousInside = previousVertex.w < W_CLIPPING_PLANE ? -1 : 1;
+
+//     for(int i = 0; i < vertices.size(); i++ )
+//     {
+//     	currentVertex = vertices[i];
+    	
+//         currentInside  =  currentVertex.w <= W_CLIPPING_PLANE ? -1 : 1;
+
+//         if (previousInside * currentInside < 0) // One end in and one out since -1 * 1 = -1
+//     	{
+//         	//Need to clip against plane w=0
+			
+//         	a = (W_CLIPPING_PLANE - previousVertex.w ) / (previousVertex.w - currentVertex.w);
+			
+//         	// I = Qp + f(Qc-Qp))
+//         	glm::vec4 intersectionPoint(currentVertex);         
+//         	intersectionPoint = previousVertex - intersectionPoint;    
+//         	intersectionPoint = a * intersectionPoint;                  
+//         	intersectionPoint = previousVertex + intersectionPoint;     
+			
+//         	// Insert
+//         	out[i] = glm::vec4(intersectionPoint); 
+//     	}
+		
+//     	if (currentInside > 0) //if current vertex inside 
+//     	{
+//         	//Insert
+//         	out[i] = glm::vec4(currentVertex); //NEED TO COPY
+//     	}
+		
+//     	previousInside = currentInside;
+// 		previousVertex = currentVertex;
+//     }
+// }
+
+// void ClipPolygonForAxis(std::vector<glm::vec4>& vertices, int AXIS, std::vector<glm::vec4> &clipped)
+// {
+//     glm::vec4 currentVertex;
+//     glm::vec4 previousVertex;
+		
+//     char previousInside;
+//     char currentInside;
+	
+//     float a;
+//     glm::vec4 intersectionPoint;
+
+//     //Clip against first plane
+//     previousVertex = vertices[2];
+//     previousInside = previousVertex[AXIS] <= previousVertex.w ? 1 : -1;
+//     for ( int i = 0; i < vertices.size(); i++ ) 
+//     {
+//     	currentVertex = vertices[i];
+//         currentInside = currentVertex[AXIS] <= currentVertex.w ? 1 : -1;
+    			
+//         if (previousInside * currentInside < 0)
+//         {
+//             // Intersection point P can be written as a combination of both the points
+//             // P = (1-a)*P1 + a *P2
+//             //and a = (w1 + x1) / ( (w1 + x1) - (w2 + x2) )
+// 			// http://fabiensanglard.net/polygon_codec/clippingdocument/p245-blinn.pdf
+
+//             a = (previousVertex.w - previousVertex[AXIS]) / 
+//                 ((previousVertex.w - previousVertex[AXIS]) - (currentVertex.w - currentVertex[AXIS] ));
+			
+//             glm::vec4 intersectionPoint(currentVertex);
+//             intersectionPoint = previousVertex - intersectionPoint;
+//             intersectionPoint = a * intersectionPoint;
+//             intersectionPoint = previousVertex + intersectionPoint;
+			
+//             // Insert
+//             clipped[i] = glm::vec4(intersectionPoint);
+//         }
+		
+//         if (currentInside > 0)
+//         {
+//             //Insert
+//             clipped[i] = glm::vec4(currentVertex);
+//         }
+		
+//         previousInside = currentInside;
+//         //Move forward
+//         previousVertex = currentVertex;
+//     }
+
+//     //Clip against opposite plane
+//     previousVertex = vertices[2];
+//     previousInside = previousVertex[AXIS] <= previousVertex.w ? 1 : -1;
+//     currentVertex = vertices[0];
+//     for ( int i = 0; i < vertices.size(); i++ ) 
+//     {
+//     	currentVertex = vertices[i];
+//         currentInside = currentVertex[AXIS] <= currentVertex.w ? 1 : -1;
+		
+//         if (previousInside * currentInside < 0)
+//         {
+//             //Need to clip against plan w=0
+			
+//             a = (previousVertex.w + previousVertex[AXIS]) / 
+//                 ( (previousVertex.w + previousVertex[AXIS]) - (currentVertex.w + currentVertex[AXIS]) );
+			
+// 			glm::vec4 intersectionPoint(currentVertex);
+// 			intersectionPoint = previousVertex - intersectionPoint;
+// 			intersectionPoint = a * intersectionPoint;
+// 			intersectionPoint = previousVertex + intersectionPoint;
+			
+//             clipped[i] = glm::vec4(intersectionPoint);
+//         }
+		
+//         if (currentInside > 0)
+//         {
+// 			clipped[i] = glm::vec4(currentVertex);
+//         }
+		
+//         previousInside = currentInside;
+		
+//         //Move forward
+//         previousVertex = currentVertex;
+//     }        
+// }
 
 void Update(Scene &scene, Uint8 &light_selected) {
 	// Compute frame time:

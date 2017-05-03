@@ -28,7 +28,7 @@ void Camera::Rotate(float angle, glm::vec3 axis)
 	worldToCamera = glm::rotate(worldToCamera, glm::radians(angle), axis);
 }
 
-glm::vec3 Camera::Position()
+glm::vec3 Camera::Position() const
 {
 	return position;
 }
