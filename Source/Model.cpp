@@ -11,8 +11,8 @@ Model::Model(std::string filename)
 	auto path = new std::experimental::filesystem::path(filename);
 	std::ifstream is(path->string());
 
-	Material default_material = Material("default", glm::vec3(0.75f, 0, 0.75f), glm::vec3(0.75f, 0, 0.75f), glm::vec3(0.75f, 0, 0.75f), 50.0f, 0.0f);
-	Material &material = default_material;
+	std::shared_ptr<Material> default_material = std::make_shared<Material>("default", glm::vec3(0.75f, 0, 0.75f), glm::vec3(0.75f, 0, 0.75f), glm::vec3(0.75f, 0, 0.75f), 50.0f, 0.0f);
+	std::shared_ptr<Material> material = default_material;
 
 	for (std::string str; std::getline(is, str);)
 	{
@@ -99,7 +99,7 @@ Model::Model(std::string filename)
 		else if (tokens[0].compare("usemtl") == 0)
 		{
 			std::vector<std::shared_ptr<Material>>::iterator matching = std::find_if(materials_.begin(), materials_.end(), [tokens](std::shared_ptr<Material> m) -> bool { return m->name_.compare(tokens[1]) == 0; });
-			material = *(matching->get());
+			material = *matching;
 		}
 	}
 }

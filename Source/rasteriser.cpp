@@ -382,9 +382,9 @@ Pixel VertexToPixel(const glm::vec3& world_pos, const Triangle& triangle, const 
 			PIXELS_Y * ( screen.y +  1.0f) / 2.0f),
 		camera_vertex_position.z == 0.0f ? std::numeric_limits<float>::max() : 1.0f / camera_vertex_position.z,
 		glm::vec3(camera_vertex_position),
-		triangle.normal,
-		triangle.color,
-		triangle.color,
+		triangle.normal_,
+		triangle.GetDiffuseColour(vt),
+		triangle.GetAmbientColour(vt),
 		vt
 	};
 }
