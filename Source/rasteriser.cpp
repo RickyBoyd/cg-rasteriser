@@ -268,7 +268,7 @@ void DrawTriangle(const Triangle& triangle, const Scene& scene, glm::mat4& world
 	glm::vec3 camToTri = scene.camera_.Position() - triCentre;
 
 	float dot = glm::dot(camToTri, triangle.normal_);
-	if(dot < -0.1)
+	if(dot < -0.1 && dot > 0.1)
 	{
 		return;
 	}
