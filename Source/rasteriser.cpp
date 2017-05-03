@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
 		Camera( glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f, 1.0f ));
 
 	auto cornell_box_scene_textured = Scene(
-		std::vector<ModelInstance> { ModelInstance(Model("Resources/cornell_box.obj")), 
+		std::vector<ModelInstance> { ModelInstance(Model("Resources/cornell_box_empty.obj")), 
 			ModelInstance(Model("Resources/cube_textured.obj"), glm::vec3(-0.5f, -0.5f, -0.5f)) },
 		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
 		0.2f * glm::vec3(1.0f, 1.0f, 1.0f),
@@ -388,8 +388,8 @@ Pixel VertexToPixel(const glm::vec3& world_pos, const Triangle& triangle, const 
 
 	return Pixel{
 		glm::ivec2(
-			PIXELS_X * ( screen.x  + 1.0f) / 2.0f,
-			PIXELS_Y * ( screen.y +  1.0f) / 2.0f),
+			PIXELS_X * ( screen.x + 1.0f ) / 2.0f,
+			PIXELS_Y * ( screen.y + 1.0f) / 2.0f),
 		camera_vertex_position.z == 0.0f ? std::numeric_limits<float>::max() : 1.0f / camera_vertex_position.z,
 		glm::vec3(camera_vertex_position),
 		triangle.normal_,
