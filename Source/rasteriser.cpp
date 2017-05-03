@@ -130,7 +130,12 @@ int main(int argc, char *argv[]) {
 			Camera( glm::vec3(0.0f, 4.0f, -7.0f), 30.0f, 0.0f, 0.0f ));
 #endif
 
-	Scene &scene = cornell_box_scene_textured;
+	Scene &scene = cornell_box_scene;
+
+	if (argc > 1 && strncmp(argv[1], "te", 7) == 0)
+	{
+		scene = cornell_box_scene_textured;
+	}
 
 	std::vector<Triangle> world_tris = scene.ToTriangles();
 	std::cout << "Loaded " << world_tris.size() << " tris" << std::endl;
