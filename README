@@ -27,7 +27,7 @@ See report.
 Example use:
 
 ```
-$ ./build/raytracer te
+$ ./build/rasteriser te
 ```
 
 Note: the rasteriser must be run from the *parent* of the `bin` directory
