@@ -5,6 +5,7 @@ newmtl red
    d 1.0
    illum 2
    Ni 0.0
+   Ns 0.5
    
 newmtl yellow
    Ka 0.750 0.750 0.150
@@ -13,6 +14,7 @@ newmtl yellow
    d 1.0
    illum 2
    Ni 0.0
+   Ns 0.5
    
 newmtl green
    Ka 0.150 0.750 0.150
@@ -21,6 +23,7 @@ newmtl green
    d 1.0
    illum 2
    Ni 0.0
+   Ns 0.5
    
 newmtl cyan
    Ka 0.150 0.750 0.750
@@ -29,6 +32,7 @@ newmtl cyan
    d 1.0
    illum 2
    Ni 0.0
+   Ns 0.5
    
 newmtl blue
    Ka 0.150 0.150 0.750
@@ -37,6 +41,7 @@ newmtl blue
    d 1.0
    illum 2
    Ni 0.0
+   Ns 0.5
    
 newmtl purple
    Ka 0.750 0.150 0.750
@@ -45,6 +50,7 @@ newmtl purple
    d 1.0
    illum 2
    Ni 0.0
+   Ns 0.5
    
 newmtl white
    Ka 0.750 0.750 0.750
@@ -53,3 +59,4 @@ newmtl white
    d 1.0
    illum 2
    Ni 0.0
+   Ns 0.5

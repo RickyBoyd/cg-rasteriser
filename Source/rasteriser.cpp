@@ -369,6 +369,22 @@ void DrawPolygonRows(const Triangle &triangle, const std::vector<Pixel>& left_pi
 	}
 }
 
+void clamp(glm::vec3& a, float bottom, float top)
+{
+	if(a.x > top)
+		a.x = top;
+	else if(a.x < bottom)
+		a.x = bottom;
+	if(a.y > top)
+		a.y = top;
+	else if(a.y < bottom)
+		a.y = bottom;
+	if(a.z > top)
+		a.z = top;
+	else if(a.z < bottom)
+		a.z = bottom;
+}
+
 void DrawPixel(const Pixel& pixel, const Triangle &triangle, const Scene& scene, std::vector<float>& depth_buffer, std::vector<float>& shadow_map, std::vector<glm::vec3>& frame_buffer)
 {
 	if (pixel.z_inv > depth_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x])
@@ -383,11 +399,28 @@ void DrawPixel(const Pixel& pixel, const Triangle &triangle, const Scene& scene,
 		{
 			// Compute the camera-space vector between the 3d position of the pixel and the light source
 			// TODO: cache this while camera and light static
-			vec3 camera_pixel_to_light = light.camera_position - pixel.camera_pos;
+			//vec3 camera_pixel_to_light = light.camera_position - pixel.camera_pos;
 
-			vec3 direct_light = light.color * std::max(abs(glm::dot(glm::normalize(camera_pixel_to_light), glm::normalize(pixel.camera_normal))), 0.0f) / float(4.0f * M_PI * glm::dot(camera_pixel_to_light, camera_pixel_to_light));
+			//vec3 direct_light = light.color * std::max(abs(glm::dot(glm::normalize(camera_pixel_to_light), glm::normalize(pixel.camera_normal))), 0.0f) / float(4.0f * M_PI * glm::dot(camera_pixel_to_light, camera_pixel_to_light));
 			//std::cout << "x: " << pixel.vt.x << ", y: " << pixel.vt.y << "\n";
-			frame_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x] += direct_light * triangle.GetDiffuseColour(pixel.vt) + scene.indirect_light_ * triangle.GetAmbientColour(pixel.vt);
+			//frame_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x] += direct_light * triangle.GetDiffuseColour(pixel.vt) + scene.indirect_light_ * triangle.GetAmbientColour(pixel.vt);
+
+			glm::vec3 L = normalize(light.camera_position - pixel.camera_pos);   
+  			glm::vec3 E = normalize(-pixel.camera_pos); // we are in Eye Coordinates, so EyePos is (0,0,0)  
+    		glm::vec3 R = normalize(-glm::reflect(L, pixel.camera_normal));  
+ 
+    		//calculate Ambient Term:  
+    		glm::vec3 Iamb = triangle.GetAmbientColour(pixel.vt);    
+
+    		//calculate Diffuse Term:  
+    		glm::vec3 Idiff = triangle.GetDiffuseColour(pixel.vt) * glm::max(glm::dot(pixel.camera_normal, L), 0.0f) / float(4.0f * M_PI * glm::dot(L, L));
+    		clamp(Idiff, 0.0, 1.0);     
+   
+    		// calculate Specular Term:
+    		glm::vec3 Ispec = triangle.GetSpecularColour(pixel.vt) * glm::pow(glm::max(glm::dot(R,E), 0.0f),  triangle.GetSpecularExponent(pixel.vt));
+   			clamp(Ispec, 0.0, 1.0); 
+   			// write Total Color:  
+   			frame_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x] +=  Iamb + light.color*(Idiff + Ispec);
 		}
 		//frame_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x] = illumination;
 	}
