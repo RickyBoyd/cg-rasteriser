@@ -1,0 +1,36 @@
+# COMS30115 Rasteriser
+## rg14820, rb14427
+
+## Building and running
+
+### Prerequisites
+
+* GLM
+  * `$GLMDIR` set to header location
+* SDL 1.2
+* Boost `system`, `filesystem`, `regex`
+  * Tested with Boost 1.64
+  * `$BOOST_ROOT` set to install prefix
+
+## Features
+
+See report.
+
+## Controls
+
+* Move camera with arrow keys
+* Rotate camera with `ijkl` and `uo`
+* Move newest light with `wasd`
+
+## Arguments
+
+Example use:
+
+```
+$ ./build/raytracer te
+```
+
+Note: the rasteriser must be run from the *parent* of the `bin` directory
+
+* Default: Cornell Box scene
+* Pass `te` to show texture-mapped cube (with simple specular map) in Cornell Box

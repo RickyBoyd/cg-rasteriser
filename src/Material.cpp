@@ -2,9 +2,9 @@
 #include <regex>
 #include <fstream>
 #include <memory>
+#include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/trim_all.hpp>
-#include <experimental/filesystem>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
@@ -77,8 +77,8 @@ float Material::GetSpecularIntensity(float u, float v) const
 std::vector<std::shared_ptr<Material>> Material::LoadMaterials(std::string filename)
 {
 	std::ifstream is(filename);
-	auto path = new std::experimental::filesystem::path(filename);
-	
+	auto path = boost::filesystem::path(filename);
+
 	std::vector<std::shared_ptr<Material>> materials;
 	Material *material = nullptr;
 
@@ -135,23 +135,27 @@ std::vector<std::shared_ptr<Material>> Material::LoadMaterials(std::string filen
 		}
 		else if (tokens[0].compare("map_Ka") == 0)
 		{
-			material->ambient_texture_ = stbi_load(path->replace_filename(tokens[1]).string().c_str(), &material->ambient_texture_x_, &material->ambient_texture_y_, &material->ambient_texture_n_, 0);
+			boost::filesystem::path texture_path = path.parent_path() / boost::filesystem::path(tokens[1]);
+			material->ambient_texture_ = stbi_load(texture_path.string().c_str(), &material->ambient_texture_x_, &material->ambient_texture_y_, &material->ambient_texture_n_, 0);
 		}
 		else if (tokens[0].compare("map_Kd") == 0)
 		{
-			material->diffuse_texture_ = stbi_load(path->replace_filename(tokens[1]).string().c_str(), &material->diffuse_texture_x_, &material->diffuse_texture_y_, &material->diffuse_texture_n_, 0);
+			boost::filesystem::path texture_path = path.parent_path() / boost::filesystem::path(tokens[1]);
+			material->diffuse_texture_ = stbi_load(texture_path.string().c_str(), &material->diffuse_texture_x_, &material->diffuse_texture_y_, &material->diffuse_texture_n_, 0);
 		}
 		else if (tokens[0].compare("map_Ks") == 0)
 		{
-			material->specular_colour_texture_ = stbi_load(path->replace_filename(tokens[1]).string().c_str(), &material->specular_colour_texture_x_, &material->specular_colour_texture_y_, &material->specular_colour_texture_n_, 0);
+			boost::filesystem::path texture_path = path.parent_path() / boost::filesystem::path(tokens[1]);
+			material->specular_colour_texture_ = stbi_load(texture_path.string().c_str(), &material->specular_colour_texture_x_, &material->specular_colour_texture_y_, &material->specular_colour_texture_n_, 0);
 		}
 		else if (tokens[0].compare("map_Ns") == 0)
 		{
-			material->specular_intensity_texture_ = stbi_load(path->replace_filename(tokens[1]).string().c_str(), &material->specular_intensity_texture_x_, &material->specular_intensity_texture_y_, &material->specular_intensity_texture_n_, 0);
+			boost::filesystem::path texture_path = path.parent_path() / boost::filesystem::path(tokens[1]);
+			material->specular_intensity_texture_ = stbi_load(texture_path.string().c_str(), &material->specular_intensity_texture_x_, &material->specular_intensity_texture_y_, &material->specular_intensity_texture_n_, 0);
 		}
 		else if (tokens[0].compare("map_d") == 0)
 		{
-			
+
 		}
 		else if (tokens[0].compare("map_bump") == 0 || tokens[0].compare("bump"))
 		{

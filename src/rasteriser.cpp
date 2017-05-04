@@ -1,5 +1,6 @@
 #include <iostream>
 #include <glm/glm.hpp>
+#include <glm/ext.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 #include <SDL.h>
 #include "SDLauxiliary.h"
@@ -27,7 +28,7 @@ extern "C" {
 
 #if defined(_DEBUG) && (defined _WIN32 || defined _WIN64)
 #define _CRTDBG_MAP_ALLOC
-#include <crtdbg.h>	
+#include <crtdbg.h>
 #endif
 
 using glm::vec3;
@@ -91,7 +92,7 @@ int main(int argc, char *argv[]) {
 		Camera( glm::vec3(0.0f, 0.0f, -2.0f), 0.0f, 0.0f, 0.0f, 1.0f ));
 
 	auto cornell_box_scene_textured = Scene(
-		std::vector<ModelInstance> { ModelInstance(Model("Resources/cornell_box_empty.obj")), 
+		std::vector<ModelInstance> { ModelInstance(Model("Resources/cornell_box_empty.obj")),
 			ModelInstance(Model("Resources/cube_textured.obj"), glm::vec3(-0.5f, -0.5f, -0.5f)) },
 		std::vector<Light> { Light{ vec3(-0.3f, 0.5f, -0.7f), 15.0f * vec3(1,1,1) } },
 		0.2f * glm::vec3(1.0f, 1.0f, 1.0f),
@@ -196,7 +197,7 @@ void Draw(Scene &scene, const std::vector<Triangle> &triangles, std::vector<floa
 
 	//glm::worldToLight;
 	//glm::mat4 light_projection = glm::ortho(2.0f, 2.0f, 0.1f, 10.0f );
-	
+
 
 	for (auto triangle : triangles)
 	{
@@ -256,7 +257,7 @@ void ComputeLine(const Pixel a, const Pixel b, std::vector<Pixel> &line)
 {
 	int delta_x = glm::abs(a.pos.x - b.pos.x);
 	int delta_y = glm::abs(a.pos.y - b.pos.y);
-	int pixels = glm::max(delta_x, delta_y) + 1; // TODO: why +1?
+	int pixels = std::max(delta_x, delta_y) + 1; // TODO: why +1?
 	line.resize(pixels);
 	Interpolate(a, b, line);
 }
@@ -268,7 +269,7 @@ void DrawTriangle(const Triangle& triangle, const Scene& scene, glm::mat4& world
 	glm::vec3 camToTri = scene.camera_.Position() - triCentre;
 
 	float dot = glm::dot(camToTri, triangle.normal_);
-	if(dot < -0.1)
+	if(dot < -0.15 && dot > 0.15)
 	{
 		return;
 	}
@@ -385,7 +386,7 @@ void DrawPixel(const Pixel& pixel, const Triangle &triangle, const Scene& scene,
 			// TODO: cache this while camera and light static
 			vec3 camera_pixel_to_light = light.camera_position - pixel.camera_pos;
 
-			vec3 direct_light = light.color * std::max(abs(glm::dot(glm::normalize(camera_pixel_to_light), glm::normalize(pixel.camera_normal))), 0.0f) / float(4.0f * M_PI * glm::dot(camera_pixel_to_light, camera_pixel_to_light));
+			vec3 direct_light = light.color * std::max(fabsf(glm::dot(glm::normalize(camera_pixel_to_light), glm::normalize(pixel.camera_normal))), 0.0f) / float(4.0f * M_PI * glm::dot(camera_pixel_to_light, camera_pixel_to_light));
 			//std::cout << "x: " << pixel.vt.x << ", y: " << pixel.vt.y << "\n";
 			frame_buffer[pixel.pos.y * PIXELS_X + pixel.pos.x] += direct_light * triangle.GetDiffuseColour(pixel.vt) + scene.indirect_light_ * triangle.GetAmbientColour(pixel.vt);
 		}
@@ -431,11 +432,11 @@ Pixel VertexToPixel(const glm::vec3& world_pos, const Triangle& triangle, const 
 // {
 //     char previousInside;
 //     char currentInside;
-	
-//     float a;
-//     glm::vec4 intersectionPoint; 
 
-//     glm::vec4 currentVertex;  
+//     float a;
+//     glm::vec4 intersectionPoint;
+
+//     glm::vec4 currentVertex;
 //     glm::vec4 previousVertex = vertices[2];
 
 //     previousInside = previousVertex.w < W_CLIPPING_PLANE ? -1 : 1;
@@ -443,31 +444,31 @@ Pixel VertexToPixel(const glm::vec3& world_pos, const Triangle& triangle, const 
 //     for(int i = 0; i < vertices.size(); i++ )
 //     {
 //     	currentVertex = vertices[i];
-    	
+
 //         currentInside  =  currentVertex.w <= W_CLIPPING_PLANE ? -1 : 1;
 
 //         if (previousInside * currentInside < 0) // One end in and one out since -1 * 1 = -1
 //     	{
 //         	//Need to clip against plane w=0
-			
+
 //         	a = (W_CLIPPING_PLANE - previousVertex.w ) / (previousVertex.w - currentVertex.w);
-			
+
 //         	// I = Qp + f(Qc-Qp))
-//         	glm::vec4 intersectionPoint(currentVertex);         
-//         	intersectionPoint = previousVertex - intersectionPoint;    
-//         	intersectionPoint = a * intersectionPoint;                  
-//         	intersectionPoint = previousVertex + intersectionPoint;     
-			
+//         	glm::vec4 intersectionPoint(currentVertex);
+//         	intersectionPoint = previousVertex - intersectionPoint;
+//         	intersectionPoint = a * intersectionPoint;
+//         	intersectionPoint = previousVertex + intersectionPoint;
+
 //         	// Insert
-//         	out[i] = glm::vec4(intersectionPoint); 
+//         	out[i] = glm::vec4(intersectionPoint);
 //     	}
-		
-//     	if (currentInside > 0) //if current vertex inside 
+
+//     	if (currentInside > 0) //if current vertex inside
 //     	{
 //         	//Insert
 //         	out[i] = glm::vec4(currentVertex); //NEED TO COPY
 //     	}
-		
+
 //     	previousInside = currentInside;
 // 		previousVertex = currentVertex;
 //     }
@@ -477,21 +478,21 @@ Pixel VertexToPixel(const glm::vec3& world_pos, const Triangle& triangle, const 
 // {
 //     glm::vec4 currentVertex;
 //     glm::vec4 previousVertex;
-		
+
 //     char previousInside;
 //     char currentInside;
-	
+
 //     float a;
 //     glm::vec4 intersectionPoint;
 
 //     //Clip against first plane
 //     previousVertex = vertices[2];
 //     previousInside = previousVertex[AXIS] <= previousVertex.w ? 1 : -1;
-//     for ( int i = 0; i < vertices.size(); i++ ) 
+//     for ( int i = 0; i < vertices.size(); i++ )
 //     {
 //     	currentVertex = vertices[i];
 //         currentInside = currentVertex[AXIS] <= currentVertex.w ? 1 : -1;
-    			
+
 //         if (previousInside * currentInside < 0)
 //         {
 //             // Intersection point P can be written as a combination of both the points
@@ -499,24 +500,24 @@ Pixel VertexToPixel(const glm::vec3& world_pos, const Triangle& triangle, const 
 //             //and a = (w1 + x1) / ( (w1 + x1) - (w2 + x2) )
 // 			// http://fabiensanglard.net/polygon_codec/clippingdocument/p245-blinn.pdf
 
-//             a = (previousVertex.w - previousVertex[AXIS]) / 
+//             a = (previousVertex.w - previousVertex[AXIS]) /
 //                 ((previousVertex.w - previousVertex[AXIS]) - (currentVertex.w - currentVertex[AXIS] ));
-			
+
 //             glm::vec4 intersectionPoint(currentVertex);
 //             intersectionPoint = previousVertex - intersectionPoint;
 //             intersectionPoint = a * intersectionPoint;
 //             intersectionPoint = previousVertex + intersectionPoint;
-			
+
 //             // Insert
 //             clipped[i] = glm::vec4(intersectionPoint);
 //         }
-		
+
 //         if (currentInside > 0)
 //         {
 //             //Insert
 //             clipped[i] = glm::vec4(currentVertex);
 //         }
-		
+
 //         previousInside = currentInside;
 //         //Move forward
 //         previousVertex = currentVertex;
@@ -526,36 +527,36 @@ Pixel VertexToPixel(const glm::vec3& world_pos, const Triangle& triangle, const 
 //     previousVertex = vertices[2];
 //     previousInside = previousVertex[AXIS] <= previousVertex.w ? 1 : -1;
 //     currentVertex = vertices[0];
-//     for ( int i = 0; i < vertices.size(); i++ ) 
+//     for ( int i = 0; i < vertices.size(); i++ )
 //     {
 //     	currentVertex = vertices[i];
 //         currentInside = currentVertex[AXIS] <= currentVertex.w ? 1 : -1;
-		
+
 //         if (previousInside * currentInside < 0)
 //         {
 //             //Need to clip against plan w=0
-			
-//             a = (previousVertex.w + previousVertex[AXIS]) / 
+
+//             a = (previousVertex.w + previousVertex[AXIS]) /
 //                 ( (previousVertex.w + previousVertex[AXIS]) - (currentVertex.w + currentVertex[AXIS]) );
-			
+
 // 			glm::vec4 intersectionPoint(currentVertex);
 // 			intersectionPoint = previousVertex - intersectionPoint;
 // 			intersectionPoint = a * intersectionPoint;
 // 			intersectionPoint = previousVertex + intersectionPoint;
-			
+
 //             clipped[i] = glm::vec4(intersectionPoint);
 //         }
-		
+
 //         if (currentInside > 0)
 //         {
 // 			clipped[i] = glm::vec4(currentVertex);
 //         }
-		
+
 //         previousInside = currentInside;
-		
+
 //         //Move forward
 //         previousVertex = currentVertex;
-//     }        
+//     }
 // }
 
 void Update(Scene &scene, Uint8 &light_selected) {
